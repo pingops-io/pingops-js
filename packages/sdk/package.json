@@ -4,10 +4,24 @@
   "description": "PingOps SDK for Node.js",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "keywords": [
+    "pingops",
+    "monitoring",
+    "observability",
+    "opentelemetry",
+    "sdk",
+    "nodejs"
+  ],
+  "license": "MIT",
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "prepublishOnly": "pnpm build"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",
@@ -15,8 +29,8 @@
     "@opentelemetry/sdk-node": "^0.208.0",
     "@opentelemetry/sdk-trace-node": "^2.2.0",
     "@opentelemetry/semantic-conventions": "^1.38.0",
-    "@pingops/otel": "workspace:*",
-    "@pingops/core": "workspace:*"
+    "@pingops/otel": "^0.1.0",
+    "@pingops/core": "^0.1.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

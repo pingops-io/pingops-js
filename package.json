@@ -11,7 +11,14 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"**/*.{ts,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,json,md}\"",
-    "docs:build": "typedoc"
+    "docs:build": "typedoc",
+    "publish:core": "pnpm --filter @pingops/core publish",
+    "publish:otel": "pnpm --filter @pingops/otel publish",
+    "publish:sdk": "pnpm --filter @pingops/sdk publish",
+    "publish:all": "pnpm publish:core && pnpm publish:otel && pnpm publish:sdk",
+    "version:patch": "pnpm -r version patch",
+    "version:minor": "pnpm -r version minor",
+    "version:major": "pnpm -r version major"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

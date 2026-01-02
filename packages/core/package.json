@@ -1,14 +1,25 @@
 {
   "name": "@pingops/core",
   "version": "0.1.0",
-  "private": true,
   "description": "Internal shared utilities for PingOps SDK",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "keywords": [
+    "pingops",
+    "monitoring",
+    "observability",
+    "opentelemetry"
+  ],
+  "license": "MIT",
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "prepublishOnly": "pnpm build"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",
