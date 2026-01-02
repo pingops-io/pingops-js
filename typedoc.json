@@ -1,0 +1,12 @@
+{
+  "entryPoints": ["packages/*/src/index.ts"],
+  "out": "docs",
+  "tsconfig": "tsconfig.typedoc.json",
+  "exclude": ["**/*.test.ts", "**/*.spec.ts", "node_modules", "dist"],
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "excludeInternal": true,
+  "readme": "README.md",
+  "name": "PingOps JS SDK",
+  "includeVersion": true
+}
