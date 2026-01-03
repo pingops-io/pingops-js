@@ -1,6 +1,6 @@
 {
   "name": "pingops-js",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "private": false,
   "description": "PingOps Node.js SDK - OpenTelemetry-compatible monitoring for API and LLM calls",
