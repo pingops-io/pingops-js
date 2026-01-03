@@ -52,6 +52,16 @@ export interface PingopsProcessorConfig {
   headersDenyList?: string[];
 
   /**
+   * Capture request body.
+   */
+  captureRequestBody?: boolean;
+
+  /**
+   * Capture response body.
+   */
+  captureResponseBody?: boolean;
+
+  /**
    * Domain allow list rules.
    */
   domainAllowList?: DomainRule[];

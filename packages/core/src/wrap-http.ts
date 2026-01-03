@@ -19,6 +19,8 @@ import {
   PINGOPS_SESSION_ID,
   PINGOPS_TAGS,
   PINGOPS_METADATA,
+  PINGOPS_CAPTURE_REQUEST_BODY,
+  PINGOPS_CAPTURE_RESPONSE_BODY,
 } from "./context-keys";
 import type { WrapHttpAttributes } from "./types";
 
@@ -171,6 +173,18 @@ function executeWrapHttpWithContext<T>(
       contextWithAttributes = contextWithAttributes.setValue(
         PINGOPS_METADATA,
         attributes.metadata
+      );
+    }
+    if (attributes.captureRequestBody !== undefined) {
+      contextWithAttributes = contextWithAttributes.setValue(
+        PINGOPS_CAPTURE_REQUEST_BODY,
+        attributes.captureRequestBody
+      );
+    }
+    if (attributes.captureResponseBody !== undefined) {
+      contextWithAttributes = contextWithAttributes.setValue(
+        PINGOPS_CAPTURE_RESPONSE_BODY,
+        attributes.captureResponseBody
       );
     }
   }

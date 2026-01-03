@@ -34,3 +34,21 @@ export const PINGOPS_TAGS = createContextKey("pingops-tags");
  * Used to propagate metadata object to all spans in the context.
  */
 export const PINGOPS_METADATA = createContextKey("pingops-metadata");
+
+/**
+ * Context key for capturing request body.
+ * When set, controls whether request bodies should be captured for HTTP spans.
+ * This allows wrapHttp to control body capture per-request.
+ */
+export const PINGOPS_CAPTURE_REQUEST_BODY = createContextKey(
+  "pingops-capture-request-body"
+);
+
+/**
+ * Context key for capturing response body.
+ * When set, controls whether response bodies should be captured for HTTP spans.
+ * This allows wrapHttp to control body capture per-request.
+ */
+export const PINGOPS_CAPTURE_RESPONSE_BODY = createContextKey(
+  "pingops-capture-response-body"
+);

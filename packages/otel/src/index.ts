@@ -10,5 +10,13 @@ export {
   shutdownTracerProvider,
 } from "./tracer-provider";
 export { getInstrumentations } from "./instrumentations";
-export { createHttpInstrumentation } from "./instrumentations/http";
-export { createUndiciInstrumentation } from "./instrumentations/undici";
+export { createHttpInstrumentation } from "./instrumentations/http/http";
+export { createUndiciInstrumentation } from "./instrumentations/undici/undici";
+export {
+  PingopsHttpInstrumentation,
+  PingopsHttpSemanticAttributes,
+  type PingopsHttpInstrumentationConfig,
+  PingopsSemanticAttributes,
+  type NetworkTimings,
+  type PingopsInstrumentationConfig,
+} from "./instrumentations/http/pingops-http";

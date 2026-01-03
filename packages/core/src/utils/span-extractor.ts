@@ -47,13 +47,42 @@ function getDomainRule(
 }
 
 /**
+ * Determines if body should be captured based on priority:
+ * domain rule > global config > default (false)
+ */
+function shouldCaptureBody(
+  domainRule: DomainRule | undefined,
+  globalConfig: boolean | undefined,
+  bodyType: "request" | "response"
+): boolean {
+  // Check domain-specific rule first
+  if (domainRule) {
+    const domainValue =
+      bodyType === "request"
+        ? domainRule.captureRequestBody
+        : domainRule.captureResponseBody;
+    if (domainValue !== undefined) {
+      return domainValue;
+    }
+  }
+  // Fall back to global config
+  if (globalConfig !== undefined) {
+    return globalConfig;
+  }
+  // Default to false
+  return false;
+}
+
+/**
  * Extracts structured payload from a span
  */
 export function extractSpanPayload(
   span: ReadableSpan,
   domainAllowList?: DomainRule[],
   globalHeadersAllowList?: string[],
-  globalHeadersDenyList?: string[]
+  globalHeadersDenyList?: string[],
+  globalCaptureRequestBody?: boolean,
+  globalCaptureResponseBody?: boolean
 ): SpanPayload | null {
   const attributes = span.attributes;
   const url =
@@ -66,6 +95,18 @@ export function extractSpanPayload(
   const headersAllowList =
     domainRule?.headersAllowList ?? globalHeadersAllowList;
   const headersDenyList = domainRule?.headersDenyList ?? globalHeadersDenyList;
+
+  // Determine if bodies should be captured
+  const shouldCaptureReqBody = shouldCaptureBody(
+    domainRule,
+    globalCaptureRequestBody,
+    "request"
+  );
+  const shouldCaptureRespBody = shouldCaptureBody(
+    domainRule,
+    globalCaptureResponseBody,
+    "response"
+  );
 
   // Extract HTTP headers if available
   let requestHeaders: Record<string, string | string[] | undefined> = {};
@@ -160,6 +201,15 @@ export function extractSpanPayload(
 
   if (Object.keys(responseHeaders).length > 0) {
     extractedAttributes["http.response.header"] = responseHeaders;
+  }
+
+  // Remove body attributes if capture is disabled
+  if (!shouldCaptureReqBody) {
+    delete extractedAttributes["http.request.body"];
+  }
+
+  if (!shouldCaptureRespBody) {
+    delete extractedAttributes["http.response.body"];
   }
 
   // Build span payload

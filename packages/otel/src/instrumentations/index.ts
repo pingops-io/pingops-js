@@ -2,10 +2,9 @@
  * Instrumentation setup for HTTP, fetch, undici, and GenAI
  */
 
-import { registerInstrumentations } from "@opentelemetry/instrumentation";
 import type { Instrumentation } from "@opentelemetry/instrumentation";
-import { createHttpInstrumentation } from "./http";
-import { createUndiciInstrumentation } from "./undici";
+import { createHttpInstrumentation } from "./http/http";
+import { createUndiciInstrumentation } from "./undici/undici";
 
 let installed = false;
 
@@ -27,13 +26,9 @@ export function getInstrumentations(
     return [];
   }
 
-  registerInstrumentations({
-    instrumentations: [
-      createHttpInstrumentation(isGlobalInstrumentationEnabled),
-      createUndiciInstrumentation(isGlobalInstrumentationEnabled),
-    ],
-  });
-
   installed = true;
-  return [];
+  return [
+    createHttpInstrumentation(isGlobalInstrumentationEnabled),
+    createUndiciInstrumentation(isGlobalInstrumentationEnabled),
+  ];
 }

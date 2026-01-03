@@ -24,7 +24,7 @@ const PINGOPS_GLOBAL_SYMBOL = Symbol.for("pingops");
 /**
  * Logger instance for tracer provider
  */
-const log = createLogger("[PingOps TracerProvider]");
+const logger = createLogger("[PingOps TracerProvider]");
 
 /**
  * Global state interface
@@ -60,12 +60,12 @@ function getGlobalState(): PingopsGlobalState {
 
     if (typeof g !== "object" || g === null) {
       // Fallback if globalThis is not available
-      log.warn("globalThis is not available, using fallback state");
+      logger.warn("globalThis is not available, using fallback state");
       return initialState;
     }
 
     if (!g[PINGOPS_GLOBAL_SYMBOL]) {
-      log.debug("Creating new global state");
+      logger.debug("Creating new global state");
       Object.defineProperty(g, PINGOPS_GLOBAL_SYMBOL, {
         value: initialState,
         writable: false, // lock the slot (not the contents)
@@ -73,12 +73,12 @@ function getGlobalState(): PingopsGlobalState {
         enumerable: false,
       });
     } else {
-      log.debug("Retrieved existing global state");
+      logger.debug("Retrieved existing global state");
     }
 
     return g[PINGOPS_GLOBAL_SYMBOL]!;
   } catch (err) {
-    log.error(
+    logger.error(
       "Failed to access global state:",
       err instanceof Error ? err.message : String(err)
     );
@@ -106,12 +106,14 @@ export function setPingopsTracerProvider(
   state.isolatedTracerProvider = provider;
 
   if (provider) {
-    log.info("Set isolated TracerProvider", {
+    logger.info("Set isolated TracerProvider", {
       hadPrevious: hadProvider,
       providerType: provider.constructor.name,
     });
   } else {
-    log.info("Cleared isolated TracerProvider", { hadPrevious: hadProvider });
+    logger.info("Cleared isolated TracerProvider", {
+      hadPrevious: hadProvider,
+    });
   }
 }
 
@@ -128,14 +130,14 @@ export function getPingopsTracerProvider(): TracerProvider {
   const { isolatedTracerProvider } = getGlobalState();
 
   if (isolatedTracerProvider) {
-    log.debug("Using isolated TracerProvider", {
+    logger.debug("Using isolated TracerProvider", {
       providerType: isolatedTracerProvider.constructor.name,
     });
     return isolatedTracerProvider;
   }
 
   const globalProvider = trace.getTracerProvider();
-  log.debug("Using global TracerProvider", {
+  logger.debug("Using global TracerProvider", {
     providerType: globalProvider.constructor.name,
   });
   return globalProvider;
@@ -156,7 +158,7 @@ export function initializeTracerProvider(
   spanProcessors: SpanProcessor[],
   serviceName: string
 ): void {
-  log.info("Initializing TracerProvider", {
+  logger.info("Initializing TracerProvider", {
     serviceName,
     spanProcessorCount: spanProcessors.length,
   });
@@ -165,24 +167,24 @@ export function initializeTracerProvider(
   const resource = resourceFromAttributes({
     [ATTR_SERVICE_NAME]: serviceName,
   });
-  log.debug("Created resource", { serviceName });
+  logger.debug("Created resource", { serviceName });
 
   // In version 2.2.0, span processors are passed in the constructor
   const tracerProvider = new NodeTracerProvider({
     resource,
     spanProcessors,
   });
-  log.debug("Created NodeTracerProvider", {
+  logger.debug("Created NodeTracerProvider", {
     spanProcessorCount: spanProcessors.length,
   });
 
   // Register the provider globally
   tracerProvider.register();
-  log.info("Registered TracerProvider globally");
+  logger.info("Registered TracerProvider globally");
 
   // Set it in global state
   setPingopsTracerProvider(tracerProvider);
-  log.info("TracerProvider initialization complete");
+  logger.info("TracerProvider initialization complete");
 }
 
 /**
@@ -200,7 +202,7 @@ export function getTracerProvider(): NodeTracerProvider | null {
  * Shuts down the TracerProvider and flushes remaining spans
  */
 export async function shutdownTracerProvider(): Promise<void> {
-  log.info("Shutting down TracerProvider");
+  logger.info("Shutting down TracerProvider");
   const provider = getPingopsTracerProvider();
 
   // Check if provider has shutdown method (NodeTracerProvider and compatible providers)
@@ -211,21 +213,21 @@ export async function shutdownTracerProvider(): Promise<void> {
     providerWithShutdown &&
     typeof providerWithShutdown.shutdown === "function"
   ) {
-    log.debug("Calling provider.shutdown()");
+    logger.debug("Calling provider.shutdown()");
     try {
       await providerWithShutdown.shutdown();
-      log.info("TracerProvider shutdown complete");
+      logger.info("TracerProvider shutdown complete");
     } catch (error) {
-      log.error(
+      logger.error(
         "Error during TracerProvider shutdown:",
         error instanceof Error ? error.message : String(error)
       );
       throw error;
     }
   } else {
-    log.warn("TracerProvider does not have shutdown method, skipping");
+    logger.warn("TracerProvider does not have shutdown method, skipping");
   }
 
   setPingopsTracerProvider(null);
-  log.info("TracerProvider shutdown finished");
+  logger.info("TracerProvider shutdown finished");
 }

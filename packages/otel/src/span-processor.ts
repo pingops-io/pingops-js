@@ -51,8 +51,9 @@ import {
   extractSpanPayload,
 } from "@pingops/core";
 import type { PingopsProcessorConfig } from "./config";
+import { setGlobalConfig } from "./config-store";
 
-const log = createLogger("[PingOps Processor]");
+const logger = createLogger("[PingOps Processor]");
 
 /**
  * Creates a filtered span wrapper that applies header filtering to attributes
@@ -72,19 +73,24 @@ function createFilteredSpan(
   span: ReadableSpan,
   domainAllowList?: DomainRule[],
   globalHeadersAllowList?: string[],
-  globalHeadersDenyList?: string[]
+  globalHeadersDenyList?: string[],
+  globalCaptureRequestBody?: boolean,
+  globalCaptureResponseBody?: boolean
 ): ReadableSpan {
   // Use extractSpanPayload to get filtered attributes
   // This handles both domain-specific header rules and global header filtering
+  // as well as body capture filtering
   const payload = extractSpanPayload(
     span,
     domainAllowList,
     globalHeadersAllowList,
-    globalHeadersDenyList
+    globalHeadersDenyList,
+    globalCaptureRequestBody,
+    globalCaptureResponseBody
   );
   const filteredAttributes = (payload?.attributes ??
     span.attributes) as Attributes;
-  log.debug("Payload", { payload });
+  logger.debug("Payload", { payload });
 
   // Create a Proxy that intercepts 'attributes' access and forwards everything else
   return new Proxy(span, {
@@ -120,6 +126,8 @@ export class PingopsSpanProcessor implements SpanProcessor {
     headersDenyList?: string[];
     domainAllowList?: DomainRule[];
     domainDenyList?: DomainRule[];
+    captureRequestBody?: boolean;
+    captureResponseBody?: boolean;
   };
 
   /**
@@ -159,9 +167,18 @@ export class PingopsSpanProcessor implements SpanProcessor {
       headersDenyList: config.headersDenyList,
       domainAllowList: config.domainAllowList,
       domainDenyList: config.domainDenyList,
+      captureRequestBody: config.captureRequestBody,
+      captureResponseBody: config.captureResponseBody,
     };
 
-    log.info("Initialized PingopsSpanProcessor", {
+    // Register global config for instrumentations to access
+    setGlobalConfig({
+      captureRequestBody: config.captureRequestBody,
+      captureResponseBody: config.captureResponseBody,
+      domainAllowList: config.domainAllowList,
+    });
+
+    logger.info("Initialized PingopsSpanProcessor", {
       baseUrl: config.baseUrl,
       exportMode,
       batchSize: config.batchSize,
@@ -182,7 +199,7 @@ export class PingopsSpanProcessor implements SpanProcessor {
    */
   onStart(span: Span, parentContext: Context): void {
     const spanContext = span.spanContext();
-    log.debug("Span started", {
+    logger.debug("Span started", {
       spanName: span.name,
       spanId: spanContext.spanId,
       traceId: spanContext.traceId,
@@ -198,7 +215,7 @@ export class PingopsSpanProcessor implements SpanProcessor {
           span.setAttribute(key, value);
         }
       }
-      log.debug("Set propagated attributes on span", {
+      logger.debug("Set propagated attributes on span", {
         spanName: span.name,
         attributeKeys: Object.keys(propagatedAttributes),
       });
@@ -217,7 +234,7 @@ export class PingopsSpanProcessor implements SpanProcessor {
    */
   onEnd(span: ReadableSpan): void {
     const spanContext = span.spanContext();
-    log.debug("Span ended, processing", {
+    logger.debug("Span ended, processing", {
       spanName: span.name,
       spanId: spanContext.spanId,
       traceId: spanContext.traceId,
@@ -227,7 +244,7 @@ export class PingopsSpanProcessor implements SpanProcessor {
     try {
       // Step 1: Check if span is eligible (CLIENT + HTTP/GenAI attributes)
       if (!isSpanEligible(span)) {
-        log.debug("Span not eligible, skipping", {
+        logger.debug("Span not eligible, skipping", {
           spanName: span.name,
           spanId: spanContext.spanId,
           reason: "not CLIENT or missing HTTP/GenAI attributes",
@@ -244,7 +261,7 @@ export class PingopsSpanProcessor implements SpanProcessor {
           ? `https://${String(attributes["server.address"])}`
           : "");
 
-      log.debug("Extracted URL for domain filtering", {
+      logger.debug("Extracted URL for domain filtering", {
         spanName: span.name,
         url,
         hasHttpUrl: !!attributes["http.url"],
@@ -261,7 +278,7 @@ export class PingopsSpanProcessor implements SpanProcessor {
         );
 
         if (!shouldCapture) {
-          log.info("Span filtered out by domain rules", {
+          logger.info("Span filtered out by domain rules", {
             spanName: span.name,
             spanId: spanContext.spanId,
             url,
@@ -269,7 +286,7 @@ export class PingopsSpanProcessor implements SpanProcessor {
           return;
         }
       } else {
-        log.debug("No URL found for domain filtering, proceeding", {
+        logger.debug("No URL found for domain filtering, proceeding", {
           spanName: span.name,
         });
       }
@@ -279,13 +296,15 @@ export class PingopsSpanProcessor implements SpanProcessor {
         span,
         this.config.domainAllowList,
         this.config.headersAllowList,
-        this.config.headersDenyList
+        this.config.headersDenyList,
+        this.config.captureRequestBody,
+        this.config.captureResponseBody
       );
 
       // Step 5: Span passed all filters, pass filtered span to underlying processor for export
       this.processor.onEnd(filteredSpan);
 
-      log.info("Span passed all filters and queued for export", {
+      logger.info("Span passed all filters and queued for export", {
         spanName: span.name,
         spanId: spanContext.spanId,
         traceId: spanContext.traceId,
@@ -296,7 +315,7 @@ export class PingopsSpanProcessor implements SpanProcessor {
       });
     } catch (error) {
       // Defensive error handling - never crash the app
-      log.error("Error processing span", {
+      logger.error("Error processing span", {
         spanName: span.name,
         spanId: spanContext.spanId,
         error: error instanceof Error ? error.message : String(error),
@@ -310,12 +329,12 @@ export class PingopsSpanProcessor implements SpanProcessor {
    * @returns Promise that resolves when all pending operations are complete
    */
   public async forceFlush(): Promise<void> {
-    log.info("Force flushing spans");
+    logger.info("Force flushing spans");
     try {
       await this.processor.forceFlush();
-      log.info("Force flush complete");
+      logger.info("Force flush complete");
     } catch (error) {
-      log.error("Error during force flush", {
+      logger.error("Error during force flush", {
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
@@ -328,12 +347,12 @@ export class PingopsSpanProcessor implements SpanProcessor {
    * @returns Promise that resolves when shutdown is complete
    */
   public async shutdown(): Promise<void> {
-    log.info("Shutting down processor");
+    logger.info("Shutting down processor");
     try {
       await this.processor.shutdown();
-      log.info("Processor shutdown complete");
+      logger.info("Processor shutdown complete");
     } catch (error) {
-      log.error("Error during processor shutdown", {
+      logger.error("Error during processor shutdown", {
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
