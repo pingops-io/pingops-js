@@ -85,8 +85,8 @@ importers:
         specifier: ^1.38.0
         version: 1.38.0
       '@pingops/core':
-        specifier: 0.1.0
-        version: 0.1.0
+        specifier: 0.1.1
+        version: 0.1.1
     devDependencies:
       '@types/node':
         specifier: ^20.11.0
@@ -113,11 +113,11 @@ importers:
         specifier: ^1.38.0
         version: 1.38.0
       '@pingops/core':
-        specifier: 0.1.0
-        version: 0.1.0
+        specifier: 0.1.1
+        version: 0.1.1
       '@pingops/otel':
-        specifier: 0.1.0
-        version: 0.1.0
+        specifier: 0.1.1
+        version: 0.1.1
     devDependencies:
       '@types/node':
         specifier: ^20.11.0
@@ -286,12 +286,6 @@ packages:
     peerDependencies:
       '@opentelemetry/api': ^1.3.0
 
-  '@opentelemetry/instrumentation-undici@0.19.0':
-    resolution: {integrity: sha512-Pst/RhR61A2OoZQZkn6OLpdVpXp6qn3Y92wXa6umfJe9rV640r4bc6SWvw4pPN6DiQqPu2c8gnSSZPDtC6JlpQ==}
-    engines: {node: ^18.19.0 || >=20.6.0}
-    peerDependencies:
-      '@opentelemetry/api': ^1.7.0
-
   '@opentelemetry/instrumentation@0.208.0':
     resolution: {integrity: sha512-Eju0L4qWcQS+oXxi6pgh7zvE2byogAkcsVv0OjHF/97iOz1N/aKE6etSGowYkie+YA1uo6DNwdSxaaNnLvcRlA==}
     engines: {node: ^18.19.0 || >=20.6.0}
@@ -368,11 +362,11 @@ packages:
     resolution: {integrity: sha512-kocjix+/sSggfJhwXqClZ3i9Y/MI0fp7b+g7kCRm6psy2dsf8uApTRclwG18h8Avm7C9+fnt+O36PspJ/OzoWg==}
     engines: {node: '>=14'}
 
-  '@pingops/core@0.1.0':
-    resolution: {integrity: sha512-5xZ7iYiqF+nAPQ4SSQRByl6CYF3OUJOLkH0wYXixy4RTIAt5eDcS1OTO4avcY5rL6JRb1chL+efNh5LpttbDAg==}
+  '@pingops/core@0.1.1':
+    resolution: {integrity: sha512-JXpLR1646K7j+vYOHsSiWuqOmIMMKl49WP4iXVkksc4v0iiX43q0HcxB7cgoIjX1sY7Hg/pZgTsnyDsgQk5j1w==}
 
-  '@pingops/otel@0.1.0':
-    resolution: {integrity: sha512-HpaAVQo3pmb6igrt15h08/TjFKW0qWDshzQJECt8BZMKRPWO10b4htIKn7XLjGHSA1+0KF9egMVoAHCpz/CVBQ==}
+  '@pingops/otel@0.1.1':
+    resolution: {integrity: sha512-dxjS7DJFv7ct2gkUXPIL3GNk6lcoQamPWY2pyTCiXDcelzw+zOUVgwlUVHduz9Jm8+HpFvA5jGrFyNxyWX88Cw==}
 
   '@protobufjs/aspromise@1.1.2':
     resolution: {integrity: sha512-j+gKExEuLmKwvz3OgROXtrJ2UG2x8Ch2YZUxahh+s1F2HZ+wAceUNLkvy6zKCPVRkU++ZWQrdxsUeQXmcg4uoQ==}
@@ -1264,15 +1258,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@opentelemetry/instrumentation-undici@0.19.0(@opentelemetry/api@1.9.0)':
-    dependencies:
-      '@opentelemetry/api': 1.9.0
-      '@opentelemetry/core': 2.2.0(@opentelemetry/api@1.9.0)
-      '@opentelemetry/instrumentation': 0.208.0(@opentelemetry/api@1.9.0)
-      '@opentelemetry/semantic-conventions': 1.38.0
-    transitivePeerDependencies:
-      - supports-color
-
   '@opentelemetry/instrumentation@0.208.0(@opentelemetry/api@1.9.0)':
     dependencies:
       '@opentelemetry/api': 1.9.0
@@ -1380,23 +1365,23 @@ snapshots:
 
   '@opentelemetry/semantic-conventions@1.38.0': {}
 
-  '@pingops/core@0.1.0':
+  '@pingops/core@0.1.1':
     dependencies:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/sdk-trace-base': 2.2.0(@opentelemetry/api@1.9.0)
 
-  '@pingops/otel@0.1.0':
+  '@pingops/otel@0.1.1':
     dependencies:
       '@opentelemetry/api': 1.9.0
+      '@opentelemetry/core': 2.2.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/exporter-trace-otlp-http': 0.208.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/instrumentation': 0.208.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/instrumentation-http': 0.208.0(@opentelemetry/api@1.9.0)
-      '@opentelemetry/instrumentation-undici': 0.19.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/resources': 2.2.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/sdk-trace-base': 2.2.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/sdk-trace-node': 2.2.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/semantic-conventions': 1.38.0
-      '@pingops/core': 0.1.0
+      '@pingops/core': 0.1.1
     transitivePeerDependencies:
       - supports-color
 
