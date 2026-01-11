@@ -14,7 +14,7 @@
     "publish": false
   },
   "hooks": {
-    "before:init": ["pnpm build", "pnpm lint"],
+    "before:init": ["pnpm build"],
     "after:release": "echo 'Release ${version} completed successfully!'"
   },
   "plugins": {
