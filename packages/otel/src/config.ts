@@ -2,7 +2,7 @@
  * Configuration types for PingopsSpanProcessor
  */
 
-import type { DomainRule } from "@pingops/core";
+import type { DomainRule, HeaderRedactionConfig } from "@pingops/core";
 
 /**
  * Span export mode to use.
@@ -70,6 +70,12 @@ export interface PingopsProcessorConfig {
    * Domain deny list rules.
    */
   domainDenyList?: DomainRule[];
+
+  /**
+   * Configuration for header value redaction.
+   * If not provided, default redaction is enabled for sensitive headers.
+   */
+  headerRedaction?: HeaderRedactionConfig;
 
   /**
    * Number of spans to batch before flushing (only used in batched mode).

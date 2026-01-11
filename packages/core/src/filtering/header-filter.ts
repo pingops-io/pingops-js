@@ -1,8 +1,15 @@
 /**
- * Header filtering logic - applies allow/deny list rules
+ * Header filtering logic - applies allow/deny list rules and redaction
  */
 
 import { createLogger } from "../logger";
+import type { HeaderRedactionConfig } from "./sensitive-headers";
+import {
+  DEFAULT_REDACTION_CONFIG,
+  isSensitiveHeader,
+  redactHeaderValue,
+  HeaderRedactionStrategy,
+} from "./sensitive-headers";
 
 const log = createLogger("[PingOps HeaderFilter]");
 
@@ -14,23 +21,56 @@ function normalizeHeaderName(name: string): string {
 }
 
 /**
- * Filters headers based on allow/deny lists
+ * Merges redaction config with defaults
+ */
+function mergeRedactionConfig(
+  config?: HeaderRedactionConfig
+): Required<HeaderRedactionConfig> {
+  if (!config || config.enabled === false) {
+    return { ...DEFAULT_REDACTION_CONFIG, enabled: false };
+  }
+
+  return {
+    sensitivePatterns:
+      config.sensitivePatterns ?? DEFAULT_REDACTION_CONFIG.sensitivePatterns,
+    strategy: config.strategy ?? DEFAULT_REDACTION_CONFIG.strategy,
+    redactionString:
+      config.redactionString ?? DEFAULT_REDACTION_CONFIG.redactionString,
+    visibleChars: config.visibleChars ?? DEFAULT_REDACTION_CONFIG.visibleChars,
+    enabled: config.enabled ?? DEFAULT_REDACTION_CONFIG.enabled,
+  };
+}
+
+/**
+ * Filters headers based on allow/deny lists and applies redaction to sensitive headers
  * - Deny list always wins (if header is in deny list, exclude it)
  * - Allow list filters included headers (if specified, only include these)
+ * - Sensitive headers are redacted after filtering (if redaction is enabled)
  * - Case-insensitive matching
+ *
+ * @param headers - Headers to filter
+ * @param headersAllowList - Optional allow list of header names to include
+ * @param headersDenyList - Optional deny list of header names to exclude
+ * @param redactionConfig - Optional configuration for header value redaction
+ * @returns Filtered and redacted headers
  */
 export function filterHeaders(
   headers: Record<string, string | string[] | undefined>,
   headersAllowList?: string[],
-  headersDenyList?: string[]
+  headersDenyList?: string[],
+  redactionConfig?: HeaderRedactionConfig
 ): Record<string, string | string[] | undefined> {
   const originalCount = Object.keys(headers).length;
+  const redaction = mergeRedactionConfig(redactionConfig);
+
   log.debug("Filtering headers", {
     originalHeaderCount: originalCount,
     hasAllowList: !!headersAllowList && headersAllowList.length > 0,
     hasDenyList: !!headersDenyList && headersDenyList.length > 0,
     allowListCount: headersAllowList?.length || 0,
     denyListCount: headersDenyList?.length || 0,
+    redactionEnabled: redaction.enabled,
+    redactionStrategy: redaction.strategy,
   });
 
   const normalizedDenyList = headersDenyList?.map(normalizeHeaderName) ?? [];
@@ -39,6 +79,7 @@ export function filterHeaders(
   const filtered: Record<string, string | string[] | undefined> = {};
   const deniedHeaders: string[] = [];
   const excludedHeaders: string[] = [];
+  const redactedHeaders: string[] = [];
 
   for (const [name, value] of Object.entries(headers)) {
     const normalizedName = normalizeHeaderName(name);
@@ -59,7 +100,39 @@ export function filterHeaders(
       }
     }
 
-    filtered[name] = value;
+    // Apply redaction if enabled and header is sensitive
+    let finalValue = value;
+    if (redaction.enabled) {
+      try {
+        // Check if header matches sensitive patterns
+        if (isSensitiveHeader(name, redaction.sensitivePatterns)) {
+          // Handle REMOVE strategy at filter level
+          if (redaction.strategy === HeaderRedactionStrategy.REMOVE) {
+            log.debug("Header removed by redaction strategy", {
+              headerName: name,
+            });
+            continue;
+          }
+
+          // Redact the value
+          finalValue = redactHeaderValue(value, redaction);
+          redactedHeaders.push(name);
+          log.debug("Header value redacted", {
+            headerName: name,
+            strategy: redaction.strategy,
+          });
+        }
+      } catch (error) {
+        // Log error but don't fail - use original value as fallback
+        log.warn("Error redacting header value", {
+          headerName: name,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        finalValue = value;
+      }
+    }
+
+    filtered[name] = finalValue;
   }
 
   const filteredCount = Object.keys(filtered).length;
@@ -68,8 +141,10 @@ export function filterHeaders(
     filteredCount,
     deniedCount: deniedHeaders.length,
     excludedCount: excludedHeaders.length,
+    redactedCount: redactedHeaders.length,
     deniedHeaders: deniedHeaders.length > 0 ? deniedHeaders : undefined,
     excludedHeaders: excludedHeaders.length > 0 ? excludedHeaders : undefined,
+    redactedHeaders: redactedHeaders.length > 0 ? redactedHeaders : undefined,
   });
 
   return filtered;

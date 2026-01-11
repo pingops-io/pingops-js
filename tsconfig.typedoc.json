@@ -2,7 +2,13 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "rootDir": ".",
-    "outDir": "./dist"
+    "outDir": "./dist",
+    "baseUrl": ".",
+    "paths": {
+      "@pingops/core": ["./packages/core/src/index.ts"],
+      "@pingops/otel": ["./packages/otel/src/index.ts"],
+      "@pingops/sdk": ["./packages/sdk/src/index.ts"]
+    }
   },
   "include": ["packages/**/*.ts"],
   "exclude": [

@@ -4,6 +4,7 @@
 
 import type { ReadableSpan } from "@opentelemetry/sdk-trace-base";
 import type { DomainRule, SpanPayload } from "../types";
+import type { HeaderRedactionConfig } from "../filtering/sensitive-headers";
 import {
   filterHeaders,
   extractHeadersFromAttributes,
@@ -82,7 +83,8 @@ export function extractSpanPayload(
   globalHeadersAllowList?: string[],
   globalHeadersDenyList?: string[],
   globalCaptureRequestBody?: boolean,
-  globalCaptureResponseBody?: boolean
+  globalCaptureResponseBody?: boolean,
+  headerRedaction?: HeaderRedactionConfig
 ): SpanPayload | null {
   const attributes = span.attributes;
   const url =
@@ -148,13 +150,15 @@ export function extractSpanPayload(
     requestHeaders = filterHeaders(
       flatRequestHeaders,
       headersAllowList,
-      headersDenyList
+      headersDenyList,
+      headerRedaction
     );
   } else if (isHeadersRecord(httpRequestHeadersValue)) {
     requestHeaders = filterHeaders(
       httpRequestHeadersValue,
       headersAllowList,
-      headersDenyList
+      headersDenyList,
+      headerRedaction
     );
   }
 
@@ -162,13 +166,15 @@ export function extractSpanPayload(
     responseHeaders = filterHeaders(
       flatResponseHeaders,
       headersAllowList,
-      headersDenyList
+      headersDenyList,
+      headerRedaction
     );
   } else if (isHeadersRecord(httpResponseHeadersValue)) {
     responseHeaders = filterHeaders(
       httpResponseHeadersValue,
       headersAllowList,
-      headersDenyList
+      headersDenyList,
+      headerRedaction
     );
   }
 

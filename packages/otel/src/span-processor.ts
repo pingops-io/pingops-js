@@ -46,6 +46,7 @@ import {
   isSpanEligible,
   shouldCaptureSpan,
   type DomainRule,
+  type HeaderRedactionConfig,
   createLogger,
   getPropagatedAttributesFromContext,
   extractSpanPayload,
@@ -75,18 +76,20 @@ function createFilteredSpan(
   globalHeadersAllowList?: string[],
   globalHeadersDenyList?: string[],
   globalCaptureRequestBody?: boolean,
-  globalCaptureResponseBody?: boolean
+  globalCaptureResponseBody?: boolean,
+  headerRedaction?: HeaderRedactionConfig
 ): ReadableSpan {
   // Use extractSpanPayload to get filtered attributes
   // This handles both domain-specific header rules and global header filtering
-  // as well as body capture filtering
+  // as well as body capture filtering and header redaction
   const payload = extractSpanPayload(
     span,
     domainAllowList,
     globalHeadersAllowList,
     globalHeadersDenyList,
     globalCaptureRequestBody,
-    globalCaptureResponseBody
+    globalCaptureResponseBody,
+    headerRedaction
   );
   const filteredAttributes = (payload?.attributes ??
     span.attributes) as Attributes;
@@ -128,6 +131,7 @@ export class PingopsSpanProcessor implements SpanProcessor {
     domainDenyList?: DomainRule[];
     captureRequestBody?: boolean;
     captureResponseBody?: boolean;
+    headerRedaction?: HeaderRedactionConfig;
   };
 
   /**
@@ -169,6 +173,7 @@ export class PingopsSpanProcessor implements SpanProcessor {
       domainDenyList: config.domainDenyList,
       captureRequestBody: config.captureRequestBody,
       captureResponseBody: config.captureResponseBody,
+      headerRedaction: config.headerRedaction,
     };
 
     // Register global config for instrumentations to access
@@ -298,7 +303,8 @@ export class PingopsSpanProcessor implements SpanProcessor {
         this.config.headersAllowList,
         this.config.headersDenyList,
         this.config.captureRequestBody,
-        this.config.captureResponseBody
+        this.config.captureResponseBody,
+        this.config.headerRedaction
       );
 
       // Step 5: Span passed all filters, pass filtered span to underlying processor for export
