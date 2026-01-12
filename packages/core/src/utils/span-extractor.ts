@@ -115,6 +115,7 @@ export function extractSpanPayload(
   let responseHeaders: Record<string, string | string[] | undefined> = {};
 
   // First, try to extract flat array format headers (e.g., 'http.request.header.0', 'http.request.header.1')
+  // or direct key-value format (e.g., 'http.request.header.date', 'http.request.header.content-type')
   const flatRequestHeaders = extractHeadersFromAttributes(
     attributes,
     "http.request.header"
@@ -184,6 +185,7 @@ export function extractSpanPayload(
   };
 
   // Remove flat array format headers (e.g., 'http.request.header.0', 'http.request.header.1', etc.)
+  // and direct key-value format headers (e.g., 'http.request.header.date', 'http.request.header.content-type')
   // We'll replace them with the proper key-value format
   for (const key in extractedAttributes) {
     if (
@@ -192,11 +194,8 @@ export function extractSpanPayload(
       (key.startsWith("http.response.header.") &&
         key !== "http.response.header")
     ) {
-      // Check if it's a numeric index (flat array format)
-      const match = key.match(/^(http\.(?:request|response)\.header)\.(\d+)$/);
-      if (match) {
-        delete extractedAttributes[key];
-      }
+      // Remove both numeric index format and direct key-value format
+      delete extractedAttributes[key];
     }
   }
 

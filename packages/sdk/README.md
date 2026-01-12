@@ -10,6 +10,34 @@ pnpm add @pingops/sdk
 
 ## Quick Start
 
+### Option 1: Auto-initialization (Recommended)
+
+**Most automatic approach** - Use Node.js `--require` flag (runs before any imports):
+
+```bash
+node --require @pingops/sdk/register your-app.js
+```
+
+Set environment variables:
+
+```bash
+export PINGOPS_API_KEY="your-api-key"
+export PINGOPS_BASE_URL="https://api.pingops.com"
+export PINGOPS_SERVICE_NAME="my-service"
+```
+
+**Or** import the register file FIRST in your code:
+
+```typescript
+// Import this FIRST, before any HTTP clients
+import "@pingops/sdk/register";
+
+import axios from "axios";
+// ... rest of your code
+```
+
+### Option 2: Manual initialization
+
 ```typescript
 import { initializePingops } from "@pingops/sdk";
 
@@ -19,6 +47,8 @@ initializePingops({
   serviceName: "my-service",
 });
 ```
+
+**Important**: If using manual initialization, call `initializePingops()` before importing any HTTP clients (axios, fetch, etc.) to ensure proper instrumentation.
 
 ## Features
 

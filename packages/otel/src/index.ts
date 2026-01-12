@@ -17,6 +17,5 @@ export {
   PingopsHttpSemanticAttributes,
   type PingopsHttpInstrumentationConfig,
   PingopsSemanticAttributes,
-  type NetworkTimings,
   type PingopsInstrumentationConfig,
 } from "./instrumentations/http/pingops-http";

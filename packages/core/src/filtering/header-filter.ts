@@ -26,10 +26,17 @@ function normalizeHeaderName(name: string): string {
 function mergeRedactionConfig(
   config?: HeaderRedactionConfig
 ): Required<HeaderRedactionConfig> {
-  if (!config || config.enabled === false) {
+  // If config is undefined, use default config (enabled by default)
+  if (!config) {
+    return DEFAULT_REDACTION_CONFIG;
+  }
+
+  // If explicitly disabled, return disabled config
+  if (config.enabled === false) {
     return { ...DEFAULT_REDACTION_CONFIG, enabled: false };
   }
 
+  // Otherwise, merge with defaults (enabled defaults to true)
   return {
     sensitivePatterns:
       config.sensitivePatterns ?? DEFAULT_REDACTION_CONFIG.sensitivePatterns,
@@ -153,17 +160,16 @@ export function filterHeaders(
 /**
  * Extracts and normalizes headers from OpenTelemetry span attributes
  *
- * Handles flat array format headers (e.g., 'http.request.header.0', 'http.request.header.1')
- * and converts them to proper key-value objects.
- *
- * Some OpenTelemetry instrumentations store headers as flat arrays:
- * - 'http.request.header.0': 'Content-Type'
- * - 'http.request.header.1': 'application/json'
- * - 'http.request.header.2': 'Authorization'
- * - 'http.request.header.3': 'Bearer token'
+ * Handles two formats:
+ * 1. Flat array format (e.g., 'http.request.header.0', 'http.request.header.1')
+ *    - 'http.request.header.0': 'Content-Type'
+ *    - 'http.request.header.1': 'application/json'
+ * 2. Direct key-value format (e.g., 'http.request.header.date', 'http.request.header.content-type')
+ *    - 'http.request.header.date': 'Mon, 12 Jan 2026 20:22:38 GMT'
+ *    - 'http.request.header.content-type': 'application/json'
  *
  * This function converts them to:
- * - { 'Content-Type': 'application/json', 'Authorization': 'Bearer token' }
+ * - { 'Content-Type': 'application/json', 'date': 'Mon, 12 Jan 2026 20:22:38 GMT' }
  */
 export function extractHeadersFromAttributes(
   attributes: Record<string, unknown>,
@@ -171,40 +177,80 @@ export function extractHeadersFromAttributes(
 ): Record<string, string | string[] | undefined> | null {
   const headerMap: Record<string, string | string[] | undefined> = {};
   const headerKeys: number[] = [];
+  const directKeyValueHeaders: Array<{ key: string; headerName: string }> = [];
 
-  // Find all keys matching the pattern (e.g., 'http.request.header.0', 'http.request.header.1', etc.)
+  const prefixPattern = `${headerPrefix}.`;
+  const numericPattern = new RegExp(
+    `^${headerPrefix.replace(/\./g, "\\.")}\\.(\\d+)$`
+  );
+
+  // Find all keys matching the pattern
   for (const key in attributes) {
-    if (key.startsWith(`${headerPrefix}.`) && key !== headerPrefix) {
-      const match = key.match(new RegExp(`^${headerPrefix}\\.(\\d+)$`));
-      if (match) {
-        const index = parseInt(match[1], 10);
+    if (key.startsWith(prefixPattern) && key !== headerPrefix) {
+      // Check for numeric index format (flat array)
+      const numericMatch = key.match(numericPattern);
+      if (numericMatch) {
+        const index = parseInt(numericMatch[1], 10);
         headerKeys.push(index);
+      } else {
+        // Check for direct key-value format (e.g., 'http.request.header.date')
+        const headerName = key.substring(prefixPattern.length);
+        if (headerName.length > 0) {
+          directKeyValueHeaders.push({ key, headerName });
+        }
       }
     }
   }
 
-  // If no flat array headers found, return null
-  if (headerKeys.length === 0) {
-    return null;
+  // Process numeric index format (flat array)
+  if (headerKeys.length > 0) {
+    // Sort indices to process in order
+    headerKeys.sort((a, b) => a - b);
+
+    // Convert flat array to key-value pairs
+    // Even indices are header names, odd indices are header values
+    for (let i = 0; i < headerKeys.length; i += 2) {
+      const nameIndex = headerKeys[i];
+      const valueIndex = headerKeys[i + 1];
+
+      if (valueIndex !== undefined) {
+        const nameKey = `${headerPrefix}.${nameIndex}`;
+        const valueKey = `${headerPrefix}.${valueIndex}`;
+
+        const headerName = attributes[nameKey] as string | undefined;
+        const headerValue = attributes[valueKey] as string | undefined;
+
+        if (headerName && headerValue !== undefined) {
+          // Handle multiple values for the same header name (case-insensitive)
+          const normalizedName = headerName.toLowerCase();
+          const existingKey = Object.keys(headerMap).find(
+            (k) => k.toLowerCase() === normalizedName
+          );
+
+          if (existingKey) {
+            const existing = headerMap[existingKey];
+            headerMap[existingKey] = Array.isArray(existing)
+              ? [...existing, headerValue]
+              : [existing as string, headerValue];
+          } else {
+            // Use original case for the first occurrence
+            headerMap[headerName] = headerValue;
+          }
+        }
+      }
+    }
   }
 
-  // Sort indices to process in order
-  headerKeys.sort((a, b) => a - b);
+  // Process direct key-value format (e.g., 'http.request.header.date')
+  if (directKeyValueHeaders.length > 0) {
+    for (const { key, headerName } of directKeyValueHeaders) {
+      const headerValue = attributes[key];
 
-  // Convert flat array to key-value pairs
-  // Even indices are header names, odd indices are header values
-  for (let i = 0; i < headerKeys.length; i += 2) {
-    const nameIndex = headerKeys[i];
-    const valueIndex = headerKeys[i + 1];
+      if (headerValue !== undefined && headerValue !== null) {
+        // Convert to string if needed
+        const stringValue =
+          typeof headerValue === "string" ? headerValue : String(headerValue);
 
-    if (valueIndex !== undefined) {
-      const nameKey = `${headerPrefix}.${nameIndex}`;
-      const valueKey = `${headerPrefix}.${valueIndex}`;
-
-      const headerName = attributes[nameKey] as string | undefined;
-      const headerValue = attributes[valueKey] as string | undefined;
-
-      if (headerName && headerValue !== undefined) {
         // Handle multiple values for the same header name (case-insensitive)
         const normalizedName = headerName.toLowerCase();
         const existingKey = Object.keys(headerMap).find(
@@ -214,11 +260,11 @@ export function extractHeadersFromAttributes(
         if (existingKey) {
           const existing = headerMap[existingKey];
           headerMap[existingKey] = Array.isArray(existing)
-            ? [...existing, headerValue]
-            : [existing as string, headerValue];
+            ? [...existing, stringValue]
+            : [existing as string, stringValue];
         } else {
-          // Use original case for the first occurrence
-          headerMap[headerName] = headerValue;
+          // Use the header name as stored (may be lowercase from instrumentation)
+          headerMap[headerName] = stringValue;
         }
       }
     }

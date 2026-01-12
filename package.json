@@ -6,6 +6,7 @@
   "description": "PingOps Node.js SDK - OpenTelemetry-compatible monitoring for API and LLM calls",
   "scripts": {
     "build": "pnpm -r run build",
+    "dev": "pnpm -r run dev",
     "clean": "pnpm -r run clean",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

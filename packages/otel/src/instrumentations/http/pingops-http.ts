@@ -1,6 +1,6 @@
 /**
  * Pingops HTTP instrumentation that extends HttpInstrumentation
- * with request/response body capture and network timing metrics
+ * with request/response body capture
  */
 
 import { ClientRequest, IncomingMessage, ServerResponse } from "http";
@@ -11,7 +11,6 @@ import {
   HttpRequestCustomAttributeFunction,
   HttpResponseCustomAttributeFunction,
 } from "@opentelemetry/instrumentation-http";
-import { Socket } from "net";
 import {
   PINGOPS_CAPTURE_REQUEST_BODY,
   PINGOPS_CAPTURE_RESPONSE_BODY,
@@ -22,27 +21,11 @@ import type { DomainRule } from "@pingops/core";
 // Constants
 const DEFAULT_MAX_REQUEST_BODY_SIZE: number = 4 * 1024; // 4 KB
 const DEFAULT_MAX_RESPONSE_BODY_SIZE: number = 4 * 1024; // 4 KB
-const NETWORK_TIMINGS_PROP_NAME: string = "__networkTimings";
 
 // Semantic attributes
 export const PingopsSemanticAttributes = {
   HTTP_REQUEST_BODY: "http.request.body",
   HTTP_RESPONSE_BODY: "http.response.body",
-  NETWORK_DNS_LOOKUP_DURATION: "net.dns.lookup.duration",
-  NETWORK_TCP_CONNECT_DURATION: "net.tcp.connect.duration",
-  NETWORK_TLS_HANDSHAKE_DURATION: "net.tls.handshake.duration",
-  NETWORK_TTFB_DURATION: "net.ttfb.duration",
-  NETWORK_CONTENT_TRANSFER_DURATION: "net.content.transfer.duration",
-};
-
-// Types
-export type NetworkTimings = {
-  startAt?: number;
-  dnsLookupAt?: number;
-  tcpConnectionAt?: number;
-  tlsHandshakeAt?: number;
-  firstByteAt?: number;
-  endAt?: number;
 };
 
 export interface PingopsInstrumentationConfig {
@@ -125,68 +108,6 @@ function setAttributeValue(span: Span, attrName: string, attrValue: any): void {
     }
   }
   // TODO What should we do with other types???
-}
-
-/**
- * Processes network timings and sets them as span attributes (no spans created)
- */
-function processNetworkTimings(
-  span: Span,
-  networkTimings: NetworkTimings
-): void {
-  // Calculate and set network timing attributes (no spans created)
-  if (networkTimings.startAt && networkTimings.dnsLookupAt) {
-    span.setAttribute(
-      PingopsSemanticAttributes.NETWORK_DNS_LOOKUP_DURATION,
-      networkTimings.dnsLookupAt - networkTimings.startAt
-    );
-  }
-
-  if (networkTimings.dnsLookupAt && networkTimings.tcpConnectionAt) {
-    span.setAttribute(
-      PingopsSemanticAttributes.NETWORK_TCP_CONNECT_DURATION,
-      networkTimings.tcpConnectionAt - networkTimings.dnsLookupAt
-    );
-  }
-
-  if (networkTimings.tcpConnectionAt && networkTimings.tlsHandshakeAt) {
-    span.setAttribute(
-      PingopsSemanticAttributes.NETWORK_TLS_HANDSHAKE_DURATION,
-      networkTimings.tlsHandshakeAt - networkTimings.tcpConnectionAt
-    );
-  }
-
-  const startTTFB: number | undefined =
-    networkTimings.tlsHandshakeAt || networkTimings.tcpConnectionAt;
-  if (networkTimings.firstByteAt && startTTFB) {
-    span.setAttribute(
-      PingopsSemanticAttributes.NETWORK_TTFB_DURATION,
-      networkTimings.firstByteAt - startTTFB
-    );
-  }
-
-  if (networkTimings.firstByteAt && networkTimings.endAt) {
-    span.setAttribute(
-      PingopsSemanticAttributes.NETWORK_CONTENT_TRANSFER_DURATION,
-      networkTimings.endAt - networkTimings.firstByteAt
-    );
-  }
-}
-
-/**
- * Initializes network timings on a span
- */
-function initializeNetworkTimings(span: Span): NetworkTimings {
-  const networkTimings: NetworkTimings = {
-    startAt: Date.now(),
-  };
-  Object.defineProperty(span, NETWORK_TIMINGS_PROP_NAME, {
-    enumerable: false,
-    configurable: true,
-    writable: false,
-    value: networkTimings,
-  });
-  return networkTimings;
 }
 
 /**
@@ -350,6 +271,82 @@ function captureResponseBody(
 }
 
 /**
+ * Extracts headers from a request object (ClientRequest or IncomingMessage)
+ * Handles both types efficiently by checking for available methods/properties
+ */
+function extractRequestHeaders(
+  request: ClientRequest | IncomingMessage
+): Record<string, string | string[] | undefined> | null {
+  // IncomingMessage has a headers property (incoming requests)
+  if ("headers" in request && request.headers) {
+    return request.headers as Record<string, string | string[] | undefined>;
+  }
+
+  // ClientRequest uses getHeaders() method (outgoing requests)
+  if (typeof (request as ClientRequest).getHeaders === "function") {
+    try {
+      const headers = (request as ClientRequest).getHeaders();
+      // Convert OutgoingHttpHeaders to the expected format
+      const result: Record<string, string | string[] | undefined> = {};
+      for (const [key, value] of Object.entries(headers)) {
+        if (value !== undefined) {
+          result[key] =
+            typeof value === "number"
+              ? String(value)
+              : Array.isArray(value)
+                ? value.map(String)
+                : String(value);
+        }
+      }
+      return result;
+    } catch {
+      // getHeaders() might fail in some edge cases
+      return null;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Extracts headers from a response object (ServerResponse or IncomingMessage)
+ * Handles both types efficiently by checking for available methods/properties
+ */
+function extractResponseHeaders(
+  response: ServerResponse | IncomingMessage
+): Record<string, string | string[] | undefined> | null {
+  // IncomingMessage has a headers property (incoming responses)
+  if ("headers" in response && response.headers) {
+    return response.headers as Record<string, string | string[] | undefined>;
+  }
+
+  // ServerResponse uses getHeaders() method (outgoing responses)
+  if (typeof (response as ServerResponse).getHeaders === "function") {
+    try {
+      const headers = (response as ServerResponse).getHeaders();
+      // Convert OutgoingHttpHeaders to the expected format
+      const result: Record<string, string | string[] | undefined> = {};
+      for (const [key, value] of Object.entries(headers)) {
+        if (value !== undefined) {
+          result[key] =
+            typeof value === "number"
+              ? String(value)
+              : Array.isArray(value)
+                ? value.map(String)
+                : String(value);
+        }
+      }
+      return result;
+    } catch {
+      // getHeaders() might fail in some edge cases
+      return null;
+    }
+  }
+
+  return null;
+}
+
+/**
  * Captures HTTP request headers as span attributes
  */
 function captureRequestHeaders(
@@ -359,7 +356,7 @@ function captureRequestHeaders(
   for (const [key, value] of Object.entries(headers)) {
     if (value !== undefined) {
       span.setAttribute(
-        `pingops.http.request.header.${key.toLowerCase()}`,
+        `http.request.header.${key.toLowerCase()}`,
         Array.isArray(value) ? value.join(",") : String(value)
       );
     }
@@ -376,7 +373,7 @@ function captureResponseHeaders(
   for (const [key, value] of Object.entries(headers)) {
     if (value !== undefined) {
       span.setAttribute(
-        `pingops.http.response.header.${key.toLowerCase()}`,
+        `http.response.header.${key.toLowerCase()}`,
         Array.isArray(value) ? value.join(",") : String(value)
       );
     }
@@ -411,13 +408,11 @@ export class PingopsHttpInstrumentation extends HttpInstrumentation {
   ): HttpRequestCustomAttributeFunction {
     return (span: Span, request: ClientRequest | IncomingMessage): void => {
       // Capture request headers
-      const headers = (request as IncomingMessage).headers;
+      const headers = extractRequestHeaders(request);
       if (headers) {
         captureRequestHeaders(span, headers);
       }
       if (request instanceof ClientRequest) {
-        const networkTimings = initializeNetworkTimings(span);
-
         const maxRequestBodySize: number =
           config?.maxRequestBodySize || DEFAULT_MAX_REQUEST_BODY_SIZE;
 
@@ -456,19 +451,6 @@ export class PingopsHttpInstrumentation extends HttpInstrumentation {
           }
           return originalEnd(data);
         };
-
-        // Track network timings
-        request.on("socket", (socket: Socket) => {
-          socket.on("lookup", (): void => {
-            networkTimings.dnsLookupAt = Date.now();
-          });
-          socket.on("connect", (): void => {
-            networkTimings.tcpConnectionAt = Date.now();
-          });
-          socket.on("secureConnect", (): void => {
-            networkTimings.tlsHandshakeAt = Date.now();
-          });
-        });
       }
 
       if (originalRequestHook) {
@@ -483,16 +465,12 @@ export class PingopsHttpInstrumentation extends HttpInstrumentation {
   ): HttpResponseCustomAttributeFunction {
     return (span: Span, response: IncomingMessage | ServerResponse): void => {
       // Capture response headers
-      const headers = (response as IncomingMessage).headers;
+      const headers = extractResponseHeaders(response);
       if (headers) {
         captureResponseHeaders(span, headers);
       }
 
       if (response instanceof IncomingMessage) {
-        const networkTimings: NetworkTimings = (span as any)[
-          NETWORK_TIMINGS_PROP_NAME
-        ];
-
         const maxResponseBodySize: number =
           config?.maxResponseBodySize || DEFAULT_MAX_RESPONSE_BODY_SIZE;
 
@@ -526,11 +504,6 @@ export class PingopsHttpInstrumentation extends HttpInstrumentation {
         });
 
         response.prependOnceListener("end", (): void => {
-          if (networkTimings) {
-            networkTimings.endAt = Date.now();
-            processNetworkTimings(span, networkTimings);
-          }
-
           captureResponseBody(
             span,
             chunks,
@@ -538,12 +511,6 @@ export class PingopsHttpInstrumentation extends HttpInstrumentation {
             url
           );
         });
-
-        if (networkTimings) {
-          response.once("readable", (): void => {
-            networkTimings.firstByteAt = Date.now();
-          });
-        }
       }
 
       if (originalResponseHook) {

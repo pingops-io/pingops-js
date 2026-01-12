@@ -14,6 +14,11 @@
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs",
       "require": "./dist/index.cjs"
+    },
+    "./register": {
+      "types": "./dist/register.d.mts",
+      "import": "./dist/register.mjs",
+      "require": "./dist/register.cjs"
     }
   },
   "files": [
@@ -49,6 +54,8 @@
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
+    "axios": "^1.6.2",
+    "tsx": "^4.7.0",
     "typescript": "^5.6.0"
   }
 }
