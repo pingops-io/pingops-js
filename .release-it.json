@@ -20,7 +20,7 @@
   "plugins": {
     "@release-it/bumper": {
       "in": "package.json",
-      "out": ["package.json", "packages/*/package.json"],
+      "out": ["packages/*/package.json"],
       "dependencies": {
         "@pingops/core": "*",
         "@pingops/otel": "*",
