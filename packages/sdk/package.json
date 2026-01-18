@@ -50,10 +50,12 @@
     "@opentelemetry/sdk-trace-node": "^2.2.0",
     "@opentelemetry/semantic-conventions": "^1.38.0",
     "@pingops/otel": "workspace:^",
-    "@pingops/core": "workspace:^"
+    "@pingops/core": "workspace:^",
+    "js-yaml": "^4.1.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
+    "@types/js-yaml": "^4.0.9",
     "axios": "^1.6.2",
     "tsx": "^4.7.0",
     "typescript": "^5.6.0"

@@ -17,6 +17,7 @@ import {
   PingopsSpanProcessor,
 } from "@pingops/otel";
 import { createLogger } from "@pingops/core";
+import { loadConfigFromFile, mergeConfigWithEnv } from "./config-loader";
 import {
   setSdkInitialized,
   isGlobalInstrumentationEnabled,
@@ -50,16 +51,40 @@ let initializationPromise: Promise<void> | null = null;
  * 4. Enables HTTP/fetch/GenAI instrumentation
  * 5. Starts the SDK
  *
- * @param config - Configuration for the SDK
+ * @param config - Configuration object, config file path, or config file wrapper
  * @param explicit - Whether this is an explicit call (default: true).
  *                   Set to false when called internally by wrapHttp auto-initialization.
  */
 export function initializePingops(
   config: PingopsProcessorConfig,
+  explicit?: boolean
+): void;
+export function initializePingops(
+  configFilePath: string,
+  explicit?: boolean
+): void;
+export function initializePingops(
+  config: { configFile: string },
+  explicit?: boolean
+): void;
+export function initializePingops(
+  config:
+    | PingopsProcessorConfig
+    | string
+    | {
+        configFile: string;
+      },
   explicit: boolean = true
 ): void {
+  const resolvedConfig: PingopsProcessorConfig =
+    typeof config === "string"
+      ? resolveConfigFromFile(config)
+      : "configFile" in config
+        ? resolveConfigFromFile(config.configFile)
+        : config;
+
   if (isSdkInitializedFlag) {
-    if (config.debug) {
+    if (resolvedConfig.debug) {
       initLogger.warn("[PingOps] SDK already initialized, skipping");
     }
     return;
@@ -67,10 +92,10 @@ export function initializePingops(
 
   // Create resource with service name
   const resource = resourceFromAttributes({
-    [ATTR_SERVICE_NAME]: config.serviceName,
+    [ATTR_SERVICE_NAME]: resolvedConfig.serviceName,
   });
 
-  const processor = new PingopsSpanProcessor(config);
+  const processor = new PingopsSpanProcessor(resolvedConfig);
   const instrumentations = getInstrumentations(isGlobalInstrumentationEnabled);
 
   // Node.js SDK
@@ -106,7 +131,7 @@ export function initializePingops(
     // Set it in global state
     setPingopsTracerProvider(isolatedProvider);
   } catch (error) {
-    if (config.debug) {
+    if (resolvedConfig.debug) {
       initLogger.error(
         "[PingOps] Failed to create isolated TracerProvider:",
         error instanceof Error ? error.message : String(error)
@@ -115,9 +140,28 @@ export function initializePingops(
     // Continue without isolated provider - manual spans will use global provider
   }
 
-  if (config.debug) {
+  if (resolvedConfig.debug) {
     initLogger.info("[PingOps] SDK initialized");
   }
+}
+
+function resolveConfigFromFile(configFilePath: string): PingopsProcessorConfig {
+  const fileConfig = loadConfigFromFile(configFilePath);
+  const mergedConfig = mergeConfigWithEnv(fileConfig);
+
+  if (!mergedConfig.baseUrl || !mergedConfig.serviceName) {
+    const missing = [
+      !mergedConfig.baseUrl && "baseUrl (or PINGOPS_BASE_URL)",
+      !mergedConfig.serviceName && "serviceName (or PINGOPS_SERVICE_NAME)",
+    ].filter(Boolean);
+
+    throw new Error(
+      `initializePingops(configFile) requires ${missing.join(" and ")}. ` +
+        `Provide them in the config file or via environment variables.`
+    );
+  }
+
+  return mergedConfig as PingopsProcessorConfig;
 }
 
 /**

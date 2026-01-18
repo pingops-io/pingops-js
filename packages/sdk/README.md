@@ -41,11 +41,17 @@ import axios from "axios";
 ```typescript
 import { initializePingops } from "@pingops/sdk";
 
+// Option A: pass a config object directly
 initializePingops({
   apiKey: "your-api-key", // or set PINGOPS_API_KEY env var
   baseUrl: "https://api.pingops.com",
   serviceName: "my-service",
 });
+
+// Option B: pass a JSON/YAML config file path (env vars override file values)
+initializePingops("./pingops.config.yaml");
+// or:
+initializePingops({ configFile: "./pingops.config.json" });
 ```
 
 **Important**: If using manual initialization, call `initializePingops()` before importing any HTTP clients (axios, fetch, etc.) to ensure proper instrumentation.
