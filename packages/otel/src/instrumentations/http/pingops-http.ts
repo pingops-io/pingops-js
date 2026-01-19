@@ -17,6 +17,7 @@ import {
 } from "@pingops/core";
 import { getGlobalConfig } from "../../config-store";
 import type { DomainRule } from "@pingops/core";
+import { decodeCapturedBody } from "../body-decoder";
 
 // Constants
 const DEFAULT_MAX_REQUEST_BODY_SIZE: number = 4 * 1024; // 4 KB
@@ -250,6 +251,7 @@ function captureResponseBody(
   span: Span,
   chunks: Buffer[] | null,
   semanticAttr: string,
+  responseHeaders?: Record<string, string | string[] | undefined> | null,
   url?: string
 ): void {
   // Check if body capture is enabled
@@ -260,7 +262,13 @@ function captureResponseBody(
   if (chunks && chunks.length) {
     try {
       const concatedChunks: Buffer = Buffer.concat(chunks);
-      const responseBody: string = concatedChunks.toString("utf8");
+      const responseBody: string | undefined = decodeCapturedBody(
+        concatedChunks,
+        {
+          contentEncoding: responseHeaders?.["content-encoding"],
+          contentType: responseHeaders?.["content-type"],
+        }
+      );
       if (responseBody) {
         setAttributeValue(span, semanticAttr, responseBody);
       }
@@ -508,6 +516,7 @@ export class PingopsHttpInstrumentation extends HttpInstrumentation {
             span,
             chunks,
             PingopsSemanticAttributes.HTTP_RESPONSE_BODY,
+            headers,
             url
           );
         });

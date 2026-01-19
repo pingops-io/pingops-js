@@ -9,6 +9,8 @@ interface GlobalConfig {
   captureRequestBody?: boolean;
   captureResponseBody?: boolean;
   domainAllowList?: DomainRule[];
+  maxRequestBodySize?: number;
+  maxResponseBodySize?: number;
 }
 
 let globalConfig: GlobalConfig | null = null;

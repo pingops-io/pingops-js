@@ -58,6 +58,7 @@ import {
   type DomainRule,
 } from "@pingops/core";
 import { getGlobalConfig } from "../../config-store";
+import { decodeCapturedBody } from "../body-decoder";
 
 // Constants
 const DEFAULT_MAX_REQUEST_BODY_SIZE: number = 4 * 1024; // 4 KB
@@ -573,15 +574,34 @@ export class UndiciInstrumentation extends InstrumentationBase<UndiciInstrumenta
 
     // Check if body capture is enabled before setting response body attribute
     if (shouldCaptureResponseBody(record.url)) {
-      // Set response body attribute if we have chunks and haven't exceeded max size
-      if (
-        record.responseBodyChunks.length > 0 &&
-        record.responseBodySize !== Infinity
-      ) {
+      const config = this.getConfig();
+      const maxResponseBodySize =
+        config.maxResponseBodySize ?? DEFAULT_MAX_RESPONSE_BODY_SIZE;
+
+      const contentEncoding =
+        (record.attributes?.["http.response.header.content-encoding"] as
+          | string
+          | undefined) ?? undefined;
+      const contentType =
+        (record.attributes?.["http.response.header.content-type"] as
+          | string
+          | undefined) ?? undefined;
+
+      // If we exceeded the configured max, record a clear message rather than
+      // storing partial (often-undecodable) bytes.
+      if (record.responseBodySize === Infinity) {
+        span.setAttribute(
+          HTTP_RESPONSE_BODY,
+          `[truncated response body; exceeded maxResponseBodySize=${maxResponseBodySize}; content-type=${contentType ?? "unknown"}; content-encoding=${contentEncoding ?? "identity"}]`
+        );
+      } else if (record.responseBodyChunks.length > 0) {
+        // Set response body attribute if we have chunks and haven't exceeded max size
         try {
-          const responseBody = Buffer.concat(
-            record.responseBodyChunks
-          ).toString("utf-8");
+          const responseBodyBuffer = Buffer.concat(record.responseBodyChunks);
+          const responseBody = decodeCapturedBody(responseBodyBuffer, {
+            contentEncoding,
+            contentType,
+          });
           if (responseBody) {
             span.setAttribute(HTTP_RESPONSE_BODY, responseBody);
           }
@@ -677,9 +697,10 @@ export class UndiciInstrumentation extends InstrumentationBase<UndiciInstrumenta
     if (record.requestBodySize + chunk.length <= maxRequestBodySize) {
       record.requestBodyChunks.push(chunk);
       record.requestBodySize += chunk.length;
-    } else if (record.requestBodyChunks.length === 0) {
-      // If first chunk exceeds max size, don't track at all
-      record.requestBodySize = Infinity; // Mark as exceeded
+    } else {
+      // No need to capture partial request body; mark as exceeded and drop what we have.
+      record.requestBodySize = Infinity;
+      record.requestBodyChunks = [];
     }
   }
 
@@ -698,10 +719,15 @@ export class UndiciInstrumentation extends InstrumentationBase<UndiciInstrumenta
     }
 
     // Set request body attribute if we have chunks and haven't exceeded max size
-    if (
-      record.requestBodyChunks.length > 0 &&
-      record.requestBodySize !== Infinity
-    ) {
+    if (record.requestBodySize === Infinity) {
+      const config = this.getConfig();
+      const maxRequestBodySize =
+        config.maxRequestBodySize ?? DEFAULT_MAX_REQUEST_BODY_SIZE;
+      record.span.setAttribute(
+        HTTP_REQUEST_BODY,
+        `[truncated request body; exceeded maxRequestBodySize=${maxRequestBodySize}]`
+      );
+    } else if (record.requestBodyChunks.length > 0) {
       try {
         const requestBody = Buffer.concat(record.requestBodyChunks).toString(
           "utf-8"
@@ -741,9 +767,11 @@ export class UndiciInstrumentation extends InstrumentationBase<UndiciInstrumenta
     if (record.responseBodySize + chunk.length <= maxResponseBodySize) {
       record.responseBodyChunks.push(chunk);
       record.responseBodySize += chunk.length;
-    } else if (record.responseBodyChunks.length === 0) {
-      // If first chunk exceeds max size, don't track at all
-      record.responseBodySize = Infinity; // Mark as exceeded
+    } else {
+      // No need to capture partial response body (especially for compressed bodies
+      // where partial data is not decodable). Mark as exceeded and drop what we have.
+      record.responseBodySize = Infinity;
+      record.responseBodyChunks = [];
     }
   }
 

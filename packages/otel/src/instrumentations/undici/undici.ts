@@ -5,6 +5,7 @@
 import { UndiciInstrumentation } from "./pingops-undici";
 import { context } from "@opentelemetry/api";
 import { PINGOPS_HTTP_ENABLED } from "@pingops/core";
+import { getGlobalConfig } from "../../config-store";
 
 /**
  * Creates an Undici instrumentation instance
@@ -15,6 +16,8 @@ import { PINGOPS_HTTP_ENABLED } from "@pingops/core";
 export function createUndiciInstrumentation(
   isGlobalInstrumentationEnabled: () => boolean
 ): UndiciInstrumentation {
+  const globalConfig = getGlobalConfig();
+
   return new UndiciInstrumentation({
     enabled: true,
     ignoreRequestHook: () => {
@@ -25,5 +28,7 @@ export function createUndiciInstrumentation(
       // If global instrumentation is NOT enabled, only instrument when PINGOPS_HTTP_ENABLED is true
       return context.active().getValue(PINGOPS_HTTP_ENABLED) !== true;
     },
+    maxRequestBodySize: globalConfig?.maxRequestBodySize,
+    maxResponseBodySize: globalConfig?.maxResponseBodySize,
   });
 }

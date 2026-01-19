@@ -62,6 +62,28 @@ export interface PingopsProcessorConfig {
   captureResponseBody?: boolean;
 
   /**
+   * Maximum size of request body to capture (bytes).
+   * Applies to both `http` and `undici` instrumentations.
+   *
+   * Note: this is the number of raw bytes observed at the instrumentation layer.
+   * For compressed bodies, this is the compressed size.
+   *
+   * @defaultValue 4096 (4 KB)
+   */
+  maxRequestBodySize?: number;
+
+  /**
+   * Maximum size of response body to capture (bytes).
+   * Applies to both `http` and `undici` instrumentations.
+   *
+   * Note: this is the number of raw bytes observed at the instrumentation layer.
+   * For compressed bodies, this is the compressed size.
+   *
+   * @defaultValue 4096 (4 KB)
+   */
+  maxResponseBodySize?: number;
+
+  /**
    * Domain allow list rules.
    */
   domainAllowList?: DomainRule[];

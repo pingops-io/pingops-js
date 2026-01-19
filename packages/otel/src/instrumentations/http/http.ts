@@ -8,6 +8,7 @@ import {
   PingopsHttpInstrumentation,
   type PingopsHttpInstrumentationConfig,
 } from "./pingops-http";
+import { getGlobalConfig } from "../../config-store";
 
 /**
  * Creates an HTTP instrumentation instance
@@ -20,6 +21,8 @@ export function createHttpInstrumentation(
   isGlobalInstrumentationEnabled: () => boolean,
   config?: Partial<PingopsHttpInstrumentationConfig>
 ): PingopsHttpInstrumentation {
+  const globalConfig = getGlobalConfig();
+
   return new PingopsHttpInstrumentation({
     ignoreIncomingRequestHook: () => true, // Only instrument outgoing requests
     ignoreOutgoingRequestHook: () => {
@@ -30,6 +33,8 @@ export function createHttpInstrumentation(
       // If global instrumentation is NOT enabled, only instrument when PINGOPS_HTTP_ENABLED is true
       return context.active().getValue(PINGOPS_HTTP_ENABLED) !== true;
     },
+    maxRequestBodySize: globalConfig?.maxRequestBodySize,
+    maxResponseBodySize: globalConfig?.maxResponseBodySize,
     ...config,
   });
 }

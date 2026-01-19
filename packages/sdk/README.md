@@ -1,6 +1,6 @@
 # @pingops/sdk
 
-PingOps SDK for Node.js. Provides a simple API for bootstrapping OpenTelemetry and capturing outgoing API and LLM calls.
+PingOps SDK for Node.js. Provides a simple API for bootstrapping OpenTelemetry and capturing outgoing API calls.
 
 ## Installation
 
@@ -60,7 +60,6 @@ initializePingops({ configFile: "./pingops.config.json" });
 
 - **Automatic Instrumentation**: Captures HTTP and fetch API calls automatically
 - **Node.js Support**: Works in Node.js environments (including Node.js 20+ with native fetch)
-- **GenAI Support**: Captures LLM calls using OpenTelemetry GenAI semantic conventions
 - **Manual Instrumentation**: Create custom spans for specific operations
 - **Zero Configuration**: Works out of the box with sensible defaults
 
@@ -180,7 +179,6 @@ const tracerProvider = getTracerProvider();
 
 - **HTTP Requests**: All outgoing HTTP requests (via `http` module in Node.js)
 - **Fetch API**: All `fetch()` calls (universal JS)
-- **GenAI Calls**: LLM API calls that follow OpenTelemetry GenAI semantic conventions
 
 ## What Doesn't Get Captured
 
