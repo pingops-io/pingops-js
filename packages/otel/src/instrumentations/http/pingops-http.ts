@@ -14,10 +14,12 @@ import {
 import {
   PINGOPS_CAPTURE_REQUEST_BODY,
   PINGOPS_CAPTURE_RESPONSE_BODY,
+  bufferToBodyString,
+  HTTP_RESPONSE_CONTENT_ENCODING,
+  isCompressedContentEncoding,
 } from "@pingops/core";
 import { getGlobalConfig } from "../../config-store";
 import type { DomainRule } from "@pingops/core";
-import { decodeCapturedBody } from "../body-decoder";
 
 // Constants
 const DEFAULT_MAX_REQUEST_BODY_SIZE: number = 4 * 1024; // 4 KB
@@ -155,7 +157,7 @@ function getDomainRule(
 function shouldCaptureRequestBody(url?: string): boolean {
   const activeContext = context.active();
 
-  // Check context value first (from wrapHttp)
+  // Check context value first (from startTrace)
   const contextValue = activeContext.getValue(PINGOPS_CAPTURE_REQUEST_BODY) as
     | boolean
     | undefined;
@@ -189,7 +191,7 @@ function shouldCaptureRequestBody(url?: string): boolean {
 function shouldCaptureResponseBody(url?: string): boolean {
   const activeContext = context.active();
 
-  // Check context value first (from wrapHttp)
+  // Check context value first (from startTrace)
   const contextValue = activeContext.getValue(PINGOPS_CAPTURE_RESPONSE_BODY) as
     | boolean
     | undefined;
@@ -262,15 +264,27 @@ function captureResponseBody(
   if (chunks && chunks.length) {
     try {
       const concatedChunks: Buffer = Buffer.concat(chunks);
-      const responseBody: string | undefined = decodeCapturedBody(
-        concatedChunks,
-        {
-          contentEncoding: responseHeaders?.["content-encoding"],
-          contentType: responseHeaders?.["content-type"],
+      const contentEncoding = responseHeaders?.["content-encoding"];
+      if (isCompressedContentEncoding(contentEncoding)) {
+        setAttributeValue(
+          span,
+          semanticAttr,
+          concatedChunks.toString("base64")
+        );
+        const encStr =
+          typeof contentEncoding === "string"
+            ? contentEncoding
+            : Array.isArray(contentEncoding)
+              ? contentEncoding.map(String).join(", ")
+              : undefined;
+        if (encStr) {
+          setAttributeValue(span, HTTP_RESPONSE_CONTENT_ENCODING, encStr);
         }
-      );
-      if (responseBody) {
-        setAttributeValue(span, semanticAttr, responseBody);
+      } else {
+        const bodyStr = bufferToBodyString(concatedChunks);
+        if (bodyStr != null) {
+          setAttributeValue(span, semanticAttr, bodyStr);
+        }
       }
     } catch (e) {
       console.error("Error occurred while capturing response body:", e);

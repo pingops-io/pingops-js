@@ -1,11 +1,11 @@
 /**
  * PingOps SDK singleton for manual instrumentation
  *
- * Provides initializePingops and shutdownPingops functions.
- * wrapHttp is available from @pingops/core and will auto-initialize
- * from environment variables if needed.
+ * Provides initializePingops, shutdownPingops, startTrace, getActiveTraceId,
+ * and getActiveSpanId. startTrace can auto-initialize from environment variables if needed.
  */
 
+import { context, trace } from "@opentelemetry/api";
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
@@ -16,18 +16,27 @@ import {
   shutdownTracerProvider,
   PingopsSpanProcessor,
 } from "@pingops/otel";
-import { createLogger } from "@pingops/core";
-import { loadConfigFromFile, mergeConfigWithEnv } from "./config-loader";
 import {
-  setSdkInitialized,
-  isGlobalInstrumentationEnabled,
-} from "./init-state";
-import {
-  wrapHttp as coreWrapHttp,
-  type WrapHttpAttributes,
+  createLogger,
+  createTraceId,
+  uint8ArrayToHex,
+  type PingopsTraceAttributes,
 } from "@pingops/core";
+import {
+  PINGOPS_TRACE_ID,
+  PINGOPS_USER_ID,
+  PINGOPS_SESSION_ID,
+  PINGOPS_TAGS,
+  PINGOPS_METADATA,
+  PINGOPS_CAPTURE_REQUEST_BODY,
+  PINGOPS_CAPTURE_RESPONSE_BODY,
+} from "@pingops/core";
+import { loadConfigFromFile, mergeConfigWithEnv } from "./config-loader";
+import { setSdkInitialized } from "./init-state";
 import { getPingopsTracerProvider } from "@pingops/otel";
 import { getInstrumentations } from "@pingops/otel";
+
+const TRACE_FLAG_SAMPLED = 1;
 
 const initLogger = createLogger("[PingOps Initialize]");
 const logger = createLogger("[PingOps Pingops]");
@@ -53,7 +62,7 @@ let initializationPromise: Promise<void> | null = null;
  *
  * @param config - Configuration object, config file path, or config file wrapper
  * @param explicit - Whether this is an explicit call (default: true).
- *                   Set to false when called internally by wrapHttp auto-initialization.
+ *                   Set to false when called internally by startTrace auto-initialization.
  */
 export function initializePingops(
   config: PingopsProcessorConfig,
@@ -76,6 +85,7 @@ export function initializePingops(
       },
   explicit: boolean = true
 ): void {
+  void explicit; // Ignored: SDK always uses global instrumentation
   const resolvedConfig: PingopsProcessorConfig =
     typeof config === "string"
       ? resolveConfigFromFile(config)
@@ -96,7 +106,7 @@ export function initializePingops(
   });
 
   const processor = new PingopsSpanProcessor(resolvedConfig);
-  const instrumentations = getInstrumentations(isGlobalInstrumentationEnabled);
+  const instrumentations = getInstrumentations();
 
   // Node.js SDK
   const nodeSdk = new NodeSDK({
@@ -111,9 +121,7 @@ export function initializePingops(
   // Mark SDK as initialized
   isSdkInitializedFlag = true;
 
-  // Only enable global instrumentation if this was an explicit call
-  // If called via wrapHttp auto-initialization, global instrumentation stays disabled
-  setSdkInitialized(explicit);
+  setSdkInitialized(true);
 
   // Initialize isolated TracerProvider for manual spans AFTER NodeSDK starts
   // This ensures manual spans created via startSpan are processed by the same processor
@@ -291,69 +299,146 @@ async function ensureInitialized(): Promise<void> {
 }
 
 /**
- * Wraps a function to set attributes on HTTP spans created within the wrapped block.
+ * Returns the trace ID of the currently active span, if any.
+ */
+export function getActiveTraceId(): string | undefined {
+  return trace.getActiveSpan()?.spanContext().traceId;
+}
+
+/**
+ * Returns the span ID of the currently active span, if any.
+ */
+export function getActiveSpanId(): string | undefined {
+  return trace.getActiveSpan()?.spanContext().spanId;
+}
+
+/**
+ * Starts a new trace using the PingOps tracer provider and runs the callback within that trace.
+ * Sets attributes (traceId, userId, sessionId, tags, metadata, etc.) in context so they are
+ * propagated to spans created within the callback.
  *
- * This function sets attributes (userId, sessionId, tags, metadata) in the OpenTelemetry
- * context, which are automatically propagated to all spans created within the wrapped function.
- *
- * Instrumentation behavior:
- * - If `initializePingops` was called: All HTTP requests are instrumented by default.
- *   `wrapHttp` only adds attributes to spans created within the wrapped block.
- * - If `initializePingops` was NOT called: Only HTTP requests within `wrapHttp` blocks
- *   are instrumented. Requests outside `wrapHttp` are not instrumented.
- *
- * @param options - Options including attributes to propagate to spans
- * @param fn - Function to execute within the attribute context
- * @returns The result of the function
+ * @param options - Options including optional attributes and optional seed for deterministic traceId
+ * @param fn - Function to execute within the trace and attribute context
+ * @returns Promise resolving to the result of the function
  *
  * @example
  * ```typescript
- * import { wrapHttp } from '@pingops/sdk';
+ * import { startTrace, initializePingops } from '@pingops/sdk';
  *
- * // Scenario 1: initializePingops was called
  * initializePingops({ ... });
  *
- * // All HTTP requests are instrumented, but this block adds attributes
- * const result = await wrapHttp({
+ * const result = await startTrace({
  *   attributes: {
  *     userId: 'user-123',
  *     sessionId: 'session-456',
  *     tags: ['production', 'api'],
  *     metadata: { environment: 'prod', version: '1.0.0' }
- *   }
+ *   },
+ *   seed: 'request-123' // optional: deterministic traceId from this seed
  * }, async () => {
- *   // This HTTP request will be instrumented AND have the attributes set above
  *   const response = await fetch('https://api.example.com/users/123');
  *   return response.json();
  * });
- *
- * // HTTP requests outside wrapHttp are still instrumented, just without the attributes
- * const otherResponse = await fetch('https://api.example.com/other');
- *
- * // Scenario 2: initializePingops was NOT called
- * // Only requests within wrapHttp are instrumented
- * await wrapHttp({
- *   attributes: { userId: 'user-123' }
- * }, async () => {
- *   // This request IS instrumented
- *   return fetch('https://api.example.com/data');
- * });
- *
- * // This request is NOT instrumented (outside wrapHttp)
- * await fetch('https://api.example.com/other');
  * ```
  */
-export function wrapHttp<T>(
-  options: { attributes?: WrapHttpAttributes },
+export async function startTrace<T>(
+  options: { attributes?: PingopsTraceAttributes; seed?: string },
   fn: () => T | Promise<T>
-): T | Promise<T> {
-  return coreWrapHttp(
-    {
-      ...options,
-      checkInitialized: isSdkInitialized,
-      isGlobalInstrumentationEnabled: isGlobalInstrumentationEnabled,
-      ensureInitialized: ensureInitialized,
-    },
-    fn
+): Promise<T> {
+  if (!isSdkInitialized()) {
+    await ensureInitialized();
+  }
+
+  const traceId =
+    options.attributes?.traceId ?? (await createTraceId(options?.seed));
+  const parentSpanId = uint8ArrayToHex(
+    crypto.getRandomValues(new Uint8Array(8))
   );
+
+  const spanContext = {
+    traceId,
+    spanId: parentSpanId,
+    traceFlags: TRACE_FLAG_SAMPLED,
+  };
+
+  const activeContext = context.active();
+  const contextWithSpanContext = trace.setSpanContext(
+    activeContext,
+    spanContext
+  );
+
+  const tracer = getPingopsTracerProvider().getTracer("pingops-sdk", "1.0.0");
+
+  return new Promise((resolve, reject) => {
+    tracer.startActiveSpan(
+      "pingops-trace",
+      {},
+      contextWithSpanContext,
+      (span) => {
+        let contextWithAttributes = context.active();
+        const attrs = options.attributes;
+        if (attrs) {
+          contextWithAttributes = setAttributesInContext(
+            contextWithAttributes,
+            attrs
+          );
+        }
+        contextWithAttributes = contextWithAttributes.setValue(
+          PINGOPS_TRACE_ID,
+          traceId
+        );
+
+        const run = () => fn();
+
+        try {
+          const result = context.with(contextWithAttributes, run);
+          if (result instanceof Promise) {
+            result
+              .then((v) => {
+                span.end();
+                resolve(v);
+              })
+              .catch((err) => {
+                span.end();
+                reject(err);
+              });
+          } else {
+            span.end();
+            resolve(result);
+          }
+        } catch (err) {
+          span.end();
+          reject(err);
+        }
+      }
+    );
+  });
+}
+
+function setAttributesInContext(
+  ctx: ReturnType<typeof context.active>,
+  attrs: PingopsTraceAttributes
+): ReturnType<typeof context.active> {
+  if (attrs.userId !== undefined) {
+    ctx = ctx.setValue(PINGOPS_USER_ID, attrs.userId);
+  }
+  if (attrs.sessionId !== undefined) {
+    ctx = ctx.setValue(PINGOPS_SESSION_ID, attrs.sessionId);
+  }
+  if (attrs.tags !== undefined) {
+    ctx = ctx.setValue(PINGOPS_TAGS, attrs.tags);
+  }
+  if (attrs.metadata !== undefined) {
+    ctx = ctx.setValue(PINGOPS_METADATA, attrs.metadata);
+  }
+  if (attrs.captureRequestBody !== undefined) {
+    ctx = ctx.setValue(PINGOPS_CAPTURE_REQUEST_BODY, attrs.captureRequestBody);
+  }
+  if (attrs.captureResponseBody !== undefined) {
+    ctx = ctx.setValue(
+      PINGOPS_CAPTURE_RESPONSE_BODY,
+      attrs.captureResponseBody
+    );
+  }
+  return ctx;
 }

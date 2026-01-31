@@ -28,9 +28,10 @@ export interface SpanPayload {
 }
 
 /**
- * Attributes to propagate to HTTP spans
+ * Attributes to propagate to spans (e.g. when starting a trace with startTrace).
  */
-export interface WrapHttpAttributes {
+export interface PingopsTraceAttributes {
+  traceId?: string;
   userId?: string;
   sessionId?: string;
   tags?: string[];

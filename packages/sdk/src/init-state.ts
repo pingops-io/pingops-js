@@ -12,13 +12,3 @@ let isSdkInitializedFlag = false;
 export function setSdkInitialized(initialized: boolean): void {
   isSdkInitializedFlag = initialized;
 }
-
-/**
- * Checks if global instrumentation is enabled.
- * This is used to determine instrumentation behavior:
- * - If true: all HTTP requests are instrumented
- * - If false: only requests within wrapHttp blocks are instrumented
- */
-export function isGlobalInstrumentationEnabled(): boolean {
-  return isSdkInitializedFlag;
-}

@@ -4,6 +4,7 @@
 
 import type { Context } from "@opentelemetry/api";
 import {
+  PINGOPS_TRACE_ID,
   PINGOPS_USER_ID,
   PINGOPS_SESSION_ID,
   PINGOPS_TAGS,
@@ -21,6 +22,12 @@ export function getPropagatedAttributesFromContext(
   parentContext: Context
 ): Record<string, string | string[]> {
   const attributes: Record<string, string | string[]> = {};
+
+  // Extract traceId
+  const traceId = parentContext.getValue(PINGOPS_TRACE_ID);
+  if (traceId !== undefined && typeof traceId === "string") {
+    attributes["pingops.trace_id"] = traceId;
+  }
 
   // Extract userId
   const userId = parentContext.getValue(PINGOPS_USER_ID);

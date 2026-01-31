@@ -2,5 +2,11 @@
  * @pingops/sdk - Public API
  */
 
-export { initializePingops, shutdownPingops, wrapHttp } from "./pingops";
-export type { WrapHttpAttributes } from "@pingops/core";
+export {
+  initializePingops,
+  shutdownPingops,
+  startTrace,
+  getActiveTraceId,
+  getActiveSpanId,
+} from "./pingops";
+export type { PingopsTraceAttributes } from "@pingops/core";

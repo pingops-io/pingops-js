@@ -55,10 +55,12 @@ import {
 import {
   PINGOPS_CAPTURE_REQUEST_BODY,
   PINGOPS_CAPTURE_RESPONSE_BODY,
+  bufferToBodyString,
+  HTTP_RESPONSE_CONTENT_ENCODING,
+  isCompressedContentEncoding,
   type DomainRule,
 } from "@pingops/core";
 import { getGlobalConfig } from "../../config-store";
-import { decodeCapturedBody } from "../body-decoder";
 
 // Constants
 const DEFAULT_MAX_REQUEST_BODY_SIZE: number = 4 * 1024; // 4 KB
@@ -112,7 +114,7 @@ function getDomainRule(
 function shouldCaptureRequestBody(url?: string): boolean {
   const activeContext = context.active();
 
-  // Check context value first (from wrapHttp)
+  // Check context value first (from startTrace)
   const contextValue = activeContext.getValue(PINGOPS_CAPTURE_REQUEST_BODY) as
     | boolean
     | undefined;
@@ -146,7 +148,7 @@ function shouldCaptureRequestBody(url?: string): boolean {
 function shouldCaptureResponseBody(url?: string): boolean {
   const activeContext = context.active();
 
-  // Check context value first (from wrapHttp)
+  // Check context value first (from startTrace)
   const contextValue = activeContext.getValue(PINGOPS_CAPTURE_RESPONSE_BODY) as
     | boolean
     | undefined;
@@ -598,12 +600,22 @@ export class UndiciInstrumentation extends InstrumentationBase<UndiciInstrumenta
         // Set response body attribute if we have chunks and haven't exceeded max size
         try {
           const responseBodyBuffer = Buffer.concat(record.responseBodyChunks);
-          const responseBody = decodeCapturedBody(responseBodyBuffer, {
-            contentEncoding,
-            contentType,
-          });
-          if (responseBody) {
-            span.setAttribute(HTTP_RESPONSE_BODY, responseBody);
+          if (isCompressedContentEncoding(contentEncoding)) {
+            span.setAttribute(
+              HTTP_RESPONSE_BODY,
+              responseBodyBuffer.toString("base64")
+            );
+            if (contentEncoding) {
+              span.setAttribute(
+                HTTP_RESPONSE_CONTENT_ENCODING,
+                contentEncoding
+              );
+            }
+          } else {
+            const bodyStr = bufferToBodyString(responseBodyBuffer);
+            if (bodyStr != null) {
+              span.setAttribute(HTTP_RESPONSE_BODY, bodyStr);
+            }
           }
         } catch (e) {
           this._diag.error("Error occurred while capturing response body:", e);
