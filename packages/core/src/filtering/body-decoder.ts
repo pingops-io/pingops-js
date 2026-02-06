@@ -15,9 +15,30 @@ const COMPRESSED_ENCODINGS = new Set([
   "x-deflate",
 ]);
 
+function safeStringify(value: unknown): string | undefined {
+  if (typeof value === "string") return value;
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  ) {
+    return String(value);
+  }
+  return undefined;
+}
+
 function normalizeHeaderValue(v: unknown): string | undefined {
   if (v == null) return undefined;
-  const s = Array.isArray(v) ? v.map(String).join(", ") : String(v);
+  if (Array.isArray(v)) {
+    const parts = v
+      .map((item) => safeStringify(item))
+      .filter((item): item is string => item !== undefined);
+    const joined = parts.join(", ").trim();
+    return joined || undefined;
+  }
+
+  const s = safeStringify(v);
+  if (!s) return undefined;
   return s.trim() || undefined;
 }
 

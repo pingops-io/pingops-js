@@ -6,6 +6,13 @@
 let isSdkInitializedFlag = false;
 
 /**
+ * Returns whether the SDK has been initialized.
+ */
+export function isSdkInitialized(): boolean {
+  return isSdkInitializedFlag;
+}
+
+/**
  * Sets the SDK initialization flag.
  * Called by initializePingops when the SDK is initialized.
  */

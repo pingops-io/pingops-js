@@ -13,6 +13,18 @@ import {
 
 const log = createLogger("[PingOps HeaderFilter]");
 
+function toHeaderString(value: unknown): string | undefined {
+  if (typeof value === "string") return value;
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  ) {
+    return String(value);
+  }
+  return undefined;
+}
+
 /**
  * Normalizes header name to lowercase for case-insensitive matching
  */
@@ -248,8 +260,10 @@ export function extractHeadersFromAttributes(
 
       if (headerValue !== undefined && headerValue !== null) {
         // Convert to string if needed
-        const stringValue =
-          typeof headerValue === "string" ? headerValue : String(headerValue);
+        const stringValue = toHeaderString(headerValue);
+        if (stringValue === undefined) {
+          continue;
+        }
 
         // Handle multiple values for the same header name (case-insensitive)
         const normalizedName = headerName.toLowerCase();
@@ -300,6 +314,20 @@ export function normalizeHeaders(
   }
 
   try {
+    // Handle array first: arrays also expose entries(), so this must run
+    // before the Headers-like branch.
+    if (Array.isArray(headers)) {
+      // Try to reconstruct from array pairs
+      for (let i = 0; i < headers.length; i += 2) {
+        if (i + 1 < headers.length) {
+          const key = String(headers[i]);
+          const value = headers[i + 1] as string | string[] | undefined;
+          result[key] = value;
+        }
+      }
+      return result;
+    }
+
     // Handle Headers object (from fetch/undici)
     if (isHeadersLike(headers)) {
       for (const [key, value] of headers.entries()) {
@@ -323,19 +351,6 @@ export function normalizeHeaders(
         // Skip numeric keys (array-like objects)
         if (!/^\d+$/.test(key)) {
           result[key] = value as string | string[] | undefined;
-        }
-      }
-      return result;
-    }
-
-    // Handle array (shouldn't happen, but handle gracefully)
-    if (Array.isArray(headers)) {
-      // Try to reconstruct from array pairs
-      for (let i = 0; i < headers.length; i += 2) {
-        if (i + 1 < headers.length) {
-          const key = String(headers[i]);
-          const value = headers[i + 1] as string | string[] | undefined;
-          result[key] = value;
         }
       }
       return result;

@@ -21,25 +21,59 @@ function createReadableSpan(
 }
 
 describe("isSpanEligible", () => {
-  it("accepts spans with only modern HTTP semantic attributes", () => {
+  it("accepts CLIENT spans with modern method attribute", () => {
     const span = createReadableSpan({
       "http.request.method": "GET",
+    });
+
+    expect(isSpanEligible(span as unknown as ReadableSpan)).toBe(true);
+  });
+
+  it("accepts CLIENT spans with legacy method attribute", () => {
+    const span = createReadableSpan({
+      "http.method": "GET",
+    });
+
+    expect(isSpanEligible(span as unknown as ReadableSpan)).toBe(true);
+  });
+
+  it("accepts CLIENT spans with modern URL attribute", () => {
+    const span = createReadableSpan({
       "url.full": "https://api.example.com/v1/users",
     });
 
     expect(isSpanEligible(span as unknown as ReadableSpan)).toBe(true);
   });
 
-  it("accepts spans with only legacy HTTP semantic attributes", () => {
+  it("accepts CLIENT spans with legacy URL attribute", () => {
     const span = createReadableSpan({
-      "http.method": "GET",
       "http.url": "https://api.example.com/v1/users",
     });
 
     expect(isSpanEligible(span as unknown as ReadableSpan)).toBe(true);
   });
 
-  it("rejects spans without HTTP method/url/server attributes", () => {
+  it("accepts CLIENT spans with server.address only", () => {
+    const span = createReadableSpan({
+      "server.address": "api.example.com",
+    });
+
+    expect(isSpanEligible(span as unknown as ReadableSpan)).toBe(true);
+  });
+
+  it("rejects non-CLIENT spans even with HTTP attributes", () => {
+    const span = createReadableSpan(
+      {
+        "http.request.method": "GET",
+        "url.full": "https://api.example.com/v1/users",
+      },
+      SpanKind.SERVER
+    );
+
+    expect(isSpanEligible(span as unknown as ReadableSpan)).toBe(false);
+  });
+
+  it("rejects CLIENT spans without required HTTP/server attributes", () => {
     const span = createReadableSpan({
       "db.system": "postgresql",
       "db.operation": "SELECT",
