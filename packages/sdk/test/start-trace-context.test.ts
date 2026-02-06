@@ -92,6 +92,19 @@ describe("suppression leak handling", () => {
     });
   });
 
+  it("undici-style exporter URLs (absolute with query) remain suppressed", () => {
+    const suppressedContext = suppressTracing(context.active());
+
+    context.with(suppressedContext, () => {
+      const spanParentContext = resolveOutboundSpanParentContext(
+        context.active(),
+        "https://pingops.test/v1/traces?format=proto&compression=gzip"
+      );
+      expect(isTracingSuppressed(spanParentContext)).toBe(true);
+      expect(isClientSpanRecording(spanParentContext)).toBe(false);
+    });
+  });
+
   it("normal unsuppressed context behavior remains unchanged", () => {
     expect(isTracingSuppressed(context.active())).toBe(false);
     const spanParentContext = resolveOutboundSpanParentContext(

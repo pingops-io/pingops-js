@@ -13,6 +13,15 @@ import {
 } from "@opentelemetry/instrumentation-http";
 import type { SpanOptions } from "@opentelemetry/api";
 import {
+  ATTR_HTTP_URL,
+  ATTR_SERVER_ADDRESS,
+  ATTR_SERVER_PORT,
+  ATTR_URL_FULL,
+  ATTR_URL_PATH,
+  ATTR_URL_QUERY,
+  ATTR_URL_SCHEME,
+} from "@opentelemetry/semantic-conventions";
+import {
   PINGOPS_CAPTURE_REQUEST_BODY,
   PINGOPS_CAPTURE_RESPONSE_BODY,
   bufferToBodyString,
@@ -404,6 +413,46 @@ function captureResponseHeaders(
   }
 }
 
+function extractRequestUrlFromSpanOptions(
+  options: SpanOptions
+): string | undefined {
+  const attrs = options.attributes;
+  if (!attrs) {
+    return undefined;
+  }
+
+  if (typeof attrs[ATTR_URL_FULL] === "string") {
+    return attrs[ATTR_URL_FULL];
+  }
+  if (typeof attrs[ATTR_HTTP_URL] === "string") {
+    return attrs[ATTR_HTTP_URL];
+  }
+
+  const scheme =
+    typeof attrs[ATTR_URL_SCHEME] === "string"
+      ? attrs[ATTR_URL_SCHEME]
+      : "http";
+  const host =
+    typeof attrs[ATTR_SERVER_ADDRESS] === "string"
+      ? attrs[ATTR_SERVER_ADDRESS]
+      : undefined;
+  if (!host) {
+    return undefined;
+  }
+  const port =
+    typeof attrs[ATTR_SERVER_PORT] === "number"
+      ? `:${attrs[ATTR_SERVER_PORT]}`
+      : "";
+  const path =
+    typeof attrs[ATTR_URL_PATH] === "string" ? attrs[ATTR_URL_PATH] : "/";
+  const query =
+    typeof attrs[ATTR_URL_QUERY] === "string" &&
+    attrs[ATTR_URL_QUERY].length > 0
+      ? `?${attrs[ATTR_URL_QUERY]}`
+      : "";
+  return `${scheme}://${host}${port}${path}${query}`;
+}
+
 // Re-export semantic attributes for backward compatibility
 export const PingopsHttpSemanticAttributes = PingopsSemanticAttributes;
 
@@ -443,10 +492,7 @@ export class PingopsHttpInstrumentation extends HttpInstrumentation {
         return originalStartHttpSpan(name, options, ctx);
       }
 
-      const requestUrl =
-        typeof options.attributes?.["url.full"] === "string"
-          ? options.attributes["url.full"]
-          : undefined;
+      const requestUrl = extractRequestUrlFromSpanOptions(options);
       const spanParentContext = resolveOutboundSpanParentContext(
         ctx,
         requestUrl
