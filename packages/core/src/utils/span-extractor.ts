@@ -5,6 +5,7 @@
 import type { ReadableSpan } from "@opentelemetry/sdk-trace-base";
 import type { DomainRule, SpanPayload } from "../types";
 import type { HeaderRedactionConfig } from "../filtering/sensitive-headers";
+import { getHttpUrlFromAttributes } from "./http-attributes";
 import {
   filterHeaders,
   extractHeadersFromAttributes,
@@ -87,8 +88,7 @@ export function extractSpanPayload(
   headerRedaction?: HeaderRedactionConfig
 ): SpanPayload | null {
   const attributes = span.attributes;
-  const url =
-    (attributes["http.url"] as string) || (attributes["url.full"] as string);
+  const url = getHttpUrlFromAttributes(attributes);
 
   // Get domain-specific rule if available
   const domainRule = url ? getDomainRule(url, domainAllowList) : undefined;

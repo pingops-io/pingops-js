@@ -9,6 +9,7 @@ export * from "./filtering/header-filter";
 export * from "./filtering/sensitive-headers";
 export * from "./filtering/body-decoder";
 export * from "./utils/span-extractor";
+export * from "./utils/http-attributes";
 export * from "./utils/context-extractor";
 export * from "./logger";
 export * from "./context-keys";

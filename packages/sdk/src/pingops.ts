@@ -400,7 +400,7 @@ export async function startTrace<T>(
               })
               .catch((err) => {
                 span.end();
-                reject(err);
+                reject(err instanceof Error ? err : new Error(String(err)));
               });
           } else {
             span.end();
@@ -408,7 +408,7 @@ export async function startTrace<T>(
           }
         } catch (err) {
           span.end();
-          reject(err);
+          reject(err instanceof Error ? err : new Error(String(err)));
         }
       }
     );

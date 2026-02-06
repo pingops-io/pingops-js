@@ -50,6 +50,7 @@ import {
   createLogger,
   getPropagatedAttributesFromContext,
   extractSpanPayload,
+  getHttpUrlFromAttributes,
 } from "@pingops/core";
 import type { PingopsProcessorConfig } from "./config";
 import { setGlobalConfig } from "./config-store";
@@ -261,12 +262,7 @@ export class PingopsSpanProcessor implements SpanProcessor {
 
       // Step 2: Extract URL for domain filtering
       const attributes = span.attributes;
-      const url =
-        (attributes["http.url"] as string) ||
-        (attributes["url.full"] as string) ||
-        (attributes["server.address"]
-          ? `https://${String(attributes["server.address"])}`
-          : "");
+      const url = getHttpUrlFromAttributes(attributes) ?? "";
 
       logger.debug("Extracted URL for domain filtering", {
         spanName: span.name,

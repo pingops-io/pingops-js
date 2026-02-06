@@ -120,33 +120,33 @@ Configuration can be provided via:
 
 ### Required fields
 
-| Field          | Env var               | Description                    |
-|----------------|-----------------------|--------------------------------|
-| `baseUrl`      | `PINGOPS_BASE_URL`    | PingOps backend base URL       |
-| `serviceName`  | `PINGOPS_SERVICE_NAME`| Service name for resource      |
+| Field         | Env var                | Description               |
+| ------------- | ---------------------- | ------------------------- |
+| `baseUrl`     | `PINGOPS_BASE_URL`     | PingOps backend base URL  |
+| `serviceName` | `PINGOPS_SERVICE_NAME` | Service name for resource |
 
 `apiKey` is optional at config level; if your backend requires it, set `apiKey` or `PINGOPS_API_KEY`.
 
 ### Full configuration reference
 
-| Option                  | Type                    | Default    | Description |
-|-------------------------|-------------------------|------------|-------------|
-| `apiKey`                | `string`                | —          | API key (or `PINGOPS_API_KEY`) |
-| `baseUrl`               | `string`                | **required** | Backend base URL |
-| `serviceName`           | `string`                | **required** | Service name |
-| `debug`                 | `boolean`               | `false`    | Enable debug logs (`PINGOPS_DEBUG=true`) |
-| `headersAllowList`      | `string[]`              | —          | Headers to include (case-insensitive) |
-| `headersDenyList`       | `string[]`              | —          | Headers to exclude (overrides allow) |
-| `captureRequestBody`    | `boolean`               | `false`    | Capture request bodies (global) |
-| `captureResponseBody`   | `boolean`               | `false`    | Capture response bodies (global) |
-| `maxRequestBodySize`    | `number`                | `4096`     | Max request body size in bytes |
-| `maxResponseBodySize`   | `number`                | `4096`     | Max response body size in bytes |
-| `domainAllowList`       | `DomainRule[]`          | —          | Domains (and optional rules) to allow |
-| `domainDenyList`       | `DomainRule[]`          | —          | Domains to exclude |
-| `headerRedaction`       | `HeaderRedactionConfig` | —          | Custom header redaction |
-| `batchSize`             | `number`                | `50`       | Spans per batch (`PINGOPS_BATCH_SIZE`) |
-| `batchTimeout`          | `number`                | `5000`     | Flush interval in ms (`PINGOPS_BATCH_TIMEOUT`) |
-| `exportMode`            | `"batched"` \| `"immediate"` | `"batched"` | `PINGOPS_EXPORT_MODE` |
+| Option                | Type                         | Default      | Description                                    |
+| --------------------- | ---------------------------- | ------------ | ---------------------------------------------- |
+| `apiKey`              | `string`                     | —            | API key (or `PINGOPS_API_KEY`)                 |
+| `baseUrl`             | `string`                     | **required** | Backend base URL                               |
+| `serviceName`         | `string`                     | **required** | Service name                                   |
+| `debug`               | `boolean`                    | `false`      | Enable debug logs (`PINGOPS_DEBUG=true`)       |
+| `headersAllowList`    | `string[]`                   | —            | Headers to include (case-insensitive)          |
+| `headersDenyList`     | `string[]`                   | —            | Headers to exclude (overrides allow)           |
+| `captureRequestBody`  | `boolean`                    | `false`      | Capture request bodies (global)                |
+| `captureResponseBody` | `boolean`                    | `false`      | Capture response bodies (global)               |
+| `maxRequestBodySize`  | `number`                     | `4096`       | Max request body size in bytes                 |
+| `maxResponseBodySize` | `number`                     | `4096`       | Max response body size in bytes                |
+| `domainAllowList`     | `DomainRule[]`               | —            | Domains (and optional rules) to allow          |
+| `domainDenyList`      | `DomainRule[]`               | —            | Domains to exclude                             |
+| `headerRedaction`     | `HeaderRedactionConfig`      | —            | Custom header redaction                        |
+| `batchSize`           | `number`                     | `50`         | Spans per batch (`PINGOPS_BATCH_SIZE`)         |
+| `batchTimeout`        | `number`                     | `5000`       | Flush interval in ms (`PINGOPS_BATCH_TIMEOUT`) |
+| `exportMode`          | `"batched"` \| `"immediate"` | `"batched"`  | `PINGOPS_EXPORT_MODE`                          |
 
 **Config file path:** Set `PINGOPS_CONFIG_FILE` to the path of your JSON or YAML file when using the register entry.
 
@@ -306,15 +306,15 @@ const spanId = getActiveSpanId();
 
 Type for attributes you can pass into `startTrace({ attributes })`:
 
-| Field                   | Type                     | Description |
-|-------------------------|--------------------------|-------------|
-| `traceId`               | `string`                 | Override trace ID (otherwise one is generated or derived from `seed`) |
-| `userId`                | `string`                 | User identifier |
-| `sessionId`             | `string`                 | Session identifier |
-| `tags`                  | `string[]`               | Tags for the trace |
-| `metadata`              | `Record<string, string>` | Key-value metadata |
-| `captureRequestBody`    | `boolean`                | Override request body capture for spans in this trace |
-| `captureResponseBody`   | `boolean`                | Override response body capture for spans in this trace |
+| Field                 | Type                     | Description                                                           |
+| --------------------- | ------------------------ | --------------------------------------------------------------------- |
+| `traceId`             | `string`                 | Override trace ID (otherwise one is generated or derived from `seed`) |
+| `userId`              | `string`                 | User identifier                                                       |
+| `sessionId`           | `string`                 | Session identifier                                                    |
+| `tags`                | `string[]`               | Tags for the trace                                                    |
+| `metadata`            | `Record<string, string>` | Key-value metadata                                                    |
+| `captureRequestBody`  | `boolean`                | Override request body capture for spans in this trace                 |
+| `captureResponseBody` | `boolean`                | Override response body capture for spans in this trace                |
 
 ---
 
@@ -381,9 +381,7 @@ initializePingops({
       captureResponseBody: true,
     },
   ],
-  domainDenyList: [
-    { domain: "internal.corp.local" },
-  ],
+  domainDenyList: [{ domain: "internal.corp.local" }],
 });
 ```
 
@@ -465,14 +463,14 @@ Only **CLIENT** spans with HTTP (or supported semantic) attributes are exported 
 
 ## Summary
 
-| Goal | What to do |
-|------|------------|
-| Install | `pnpm add @pingops/sdk` |
-| Auto-init from env | `node --require @pingops/sdk/register your-app.js` or `import "@pingops/sdk/register"` first |
-| Manual init | `initializePingops({ baseUrl, serviceName, ... })` before any HTTP usage |
-| Config from file | `PINGOPS_CONFIG_FILE=./pingops.config.yaml` or `initializePingops("./pingops.config.json")` |
+| Goal               | What to do                                                                                      |
+| ------------------ | ----------------------------------------------------------------------------------------------- |
+| Install            | `pnpm add @pingops/sdk`                                                                         |
+| Auto-init from env | `node --require @pingops/sdk/register your-app.js` or `import "@pingops/sdk/register"` first    |
+| Manual init        | `initializePingops({ baseUrl, serviceName, ... })` before any HTTP usage                        |
+| Config from file   | `PINGOPS_CONFIG_FILE=./pingops.config.yaml` or `initializePingops("./pingops.config.json")`     |
 | Trace with context | `startTrace({ attributes: { userId, sessionId, tags, metadata }, seed? }, async () => { ... })` |
-| Get current IDs | `getActiveTraceId()`, `getActiveSpanId()` |
-| Graceful shutdown | `await shutdownPingops()` |
+| Get current IDs    | `getActiveTraceId()`, `getActiveSpanId()`                                                       |
+| Graceful shutdown  | `await shutdownPingops()`                                                                       |
 
 For more detail on types and options, see the [Configuration](#configuration) and [API Reference](#api-reference) sections above.
