@@ -61,6 +61,7 @@ import {
   type DomainRule,
 } from "@pingops/core";
 import { getGlobalConfig } from "../../config-store";
+import { resolveOutboundSpanParentContext } from "../suppression-guard";
 
 // Constants
 const DEFAULT_MAX_REQUEST_BODY_SIZE: number = 4 * 1024; // 4 KB
@@ -428,7 +429,11 @@ export class UndiciInstrumentation extends InstrumentationBase<UndiciInstrumenta
     //   propagate context without recording it.
     // - create a span otherwise
     const activeCtx = context.active();
-    const currentSpan = trace.getSpan(activeCtx);
+    const spanParentContext = resolveOutboundSpanParentContext(
+      activeCtx,
+      requestUrl.toString()
+    );
+    const currentSpan = trace.getSpan(spanParentContext);
     let span: Span;
 
     if (
@@ -443,7 +448,7 @@ export class UndiciInstrumentation extends InstrumentationBase<UndiciInstrumenta
           kind: SpanKind.CLIENT,
           attributes: attributes,
         },
-        activeCtx
+        spanParentContext
       );
     }
 
@@ -456,7 +461,7 @@ export class UndiciInstrumentation extends InstrumentationBase<UndiciInstrumenta
 
     // Context propagation goes last so no hook can tamper
     // the propagation headers
-    const requestContext = trace.setSpan(context.active(), span);
+    const requestContext = trace.setSpan(spanParentContext, span);
     const addedHeaders: Record<string, string> = {};
     propagation.inject(requestContext, addedHeaders);
 

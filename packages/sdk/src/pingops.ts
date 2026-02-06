@@ -5,7 +5,8 @@
  * and getActiveSpanId. startTrace can auto-initialize from environment variables if needed.
  */
 
-import { context, trace } from "@opentelemetry/api";
+import { ROOT_CONTEXT, context, trace } from "@opentelemetry/api";
+import { isTracingSuppressed } from "@opentelemetry/core";
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
@@ -49,6 +50,7 @@ let isSdkInitializedFlag = false;
  */
 let isInitialized = false;
 let initializationPromise: Promise<void> | null = null;
+let hasLoggedSuppressedStartTraceWarning = false;
 
 /**
  * Initializes PingOps SDK
@@ -362,8 +364,23 @@ export async function startTrace<T>(
   };
 
   const activeContext = context.active();
+  const traceExecutionBaseContext = isTracingSuppressed(activeContext)
+    ? ROOT_CONTEXT
+    : activeContext;
+  if (traceExecutionBaseContext === ROOT_CONTEXT) {
+    if (!hasLoggedSuppressedStartTraceWarning) {
+      logger.warn(
+        "startTrace detected a suppressed active context and is running on ROOT_CONTEXT to prevent suppression leakage into user outbound instrumentation"
+      );
+      hasLoggedSuppressedStartTraceWarning = true;
+    } else {
+      logger.debug(
+        "startTrace received a suppressed active context; running trace on ROOT_CONTEXT"
+      );
+    }
+  }
   const contextWithSpanContext = trace.setSpanContext(
-    activeContext,
+    traceExecutionBaseContext,
     spanContext
   );
 
@@ -413,6 +430,18 @@ export async function startTrace<T>(
       }
     );
   });
+}
+
+/**
+ * Runs a callback in a context that is guaranteed to be unsuppressed.
+ * Useful for task/job boundaries where suppression may have leaked.
+ */
+export function runUnsuppressed<T>(fn: () => T): T {
+  const activeContext = context.active();
+  const unsuppressedContext = isTracingSuppressed(activeContext)
+    ? ROOT_CONTEXT
+    : activeContext;
+  return context.with(unsuppressedContext, fn);
 }
 
 function setAttributesInContext(

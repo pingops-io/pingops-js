@@ -6,6 +6,7 @@ export {
   initializePingops,
   shutdownPingops,
   startTrace,
+  runUnsuppressed,
   getActiveTraceId,
   getActiveSpanId,
 } from "./pingops";

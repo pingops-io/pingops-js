@@ -237,6 +237,10 @@ process.on("SIGTERM", async () => {
 
 Starts a new trace, sets PingOps attributes (e.g. `userId`, `sessionId`, tags, metadata) in context, runs the given function inside that context, and returns the function’s result. Any spans created inside the function (including automatic HTTP/fetch spans) are part of this trace and carry the same context.
 
+If `startTrace` is called while the current OpenTelemetry context is tracing-suppressed, the SDK now starts the trace from a clean unsuppressed base context. This prevents leaked suppression flags from silently disabling outbound instrumentation for user traffic.
+
+When using `initializePingops` without `startTrace`, SDK instrumentations also guard outbound user requests against leaked suppression context. Exporter traffic remains suppressed to avoid self-instrumentation recursion.
+
 **Parameters:**
 
 - `options.attributes` — Optional [PingopsTraceAttributes](#pingopstraceattributes) to attach to the trace and propagate to spans.
@@ -270,6 +274,24 @@ const data = await startTrace(
   }
 );
 ```
+
+---
+
+### `runUnsuppressed(fn)`
+
+Runs `fn` in a clean unsuppressed OpenTelemetry context. Use this at async task/job boundaries when you are not using `startTrace`, but still need outbound HTTP/fetch instrumentation to capture spans.
+
+**Example:**
+
+```typescript
+import { runUnsuppressed } from "@pingops/sdk";
+
+await runUnsuppressed(async () => {
+  await fetch("https://api.example.com/work");
+});
+```
+
+This helper is scoped to the callback only and does not globally disable OpenTelemetry suppression.
 
 ---
 
@@ -470,6 +492,7 @@ Only **CLIENT** spans with HTTP (or supported semantic) attributes are exported 
 | Manual init        | `initializePingops({ baseUrl, serviceName, ... })` before any HTTP usage                        |
 | Config from file   | `PINGOPS_CONFIG_FILE=./pingops.config.yaml` or `initializePingops("./pingops.config.json")`     |
 | Trace with context | `startTrace({ attributes: { userId, sessionId, tags, metadata }, seed? }, async () => { ... })` |
+| Unsuppress a scope | `runUnsuppressed(async () => { ... })`                                                          |
 | Get current IDs    | `getActiveTraceId()`, `getActiveSpanId()`                                                       |
 | Graceful shutdown  | `await shutdownPingops()`                                                                       |
 

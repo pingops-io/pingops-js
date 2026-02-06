@@ -11,6 +11,7 @@ interface GlobalConfig {
   domainAllowList?: DomainRule[];
   maxRequestBodySize?: number;
   maxResponseBodySize?: number;
+  exportTraceUrl?: string;
 }
 
 let globalConfig: GlobalConfig | null = null;

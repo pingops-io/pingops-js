@@ -8,6 +8,7 @@
     "build": "pnpm -r run build",
     "dev": "pnpm -r run dev",
     "clean": "pnpm -r run clean",
+    "test": "pnpm -r run test",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"**/*.{ts,json,md}\"",

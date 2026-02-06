@@ -184,6 +184,7 @@ export class PingopsSpanProcessor implements SpanProcessor {
       domainAllowList: config.domainAllowList,
       maxRequestBodySize: config.maxRequestBodySize,
       maxResponseBodySize: config.maxResponseBodySize,
+      exportTraceUrl: `${config.baseUrl}/v1/traces`,
     });
 
     logger.info("Initialized PingopsSpanProcessor", {

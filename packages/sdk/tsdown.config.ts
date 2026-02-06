@@ -11,6 +11,7 @@ export default defineConfig({
   target: "es2022",
   external: [
     "@opentelemetry/api",
+    "@opentelemetry/core",
     "@opentelemetry/resources",
     "@opentelemetry/sdk-node",
     "@opentelemetry/sdk-trace-node",

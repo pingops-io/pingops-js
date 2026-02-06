@@ -4,13 +4,14 @@
  */
 
 import { ClientRequest, IncomingMessage, ServerResponse } from "http";
-import { Span, context } from "@opentelemetry/api";
+import { Span, SpanKind, context } from "@opentelemetry/api";
 import {
   HttpInstrumentation,
   HttpInstrumentationConfig,
   HttpRequestCustomAttributeFunction,
   HttpResponseCustomAttributeFunction,
 } from "@opentelemetry/instrumentation-http";
+import type { SpanOptions } from "@opentelemetry/api";
 import {
   PINGOPS_CAPTURE_REQUEST_BODY,
   PINGOPS_CAPTURE_RESPONSE_BODY,
@@ -20,6 +21,7 @@ import {
 } from "@pingops/core";
 import { getGlobalConfig } from "../../config-store";
 import type { DomainRule } from "@pingops/core";
+import { resolveOutboundSpanParentContext } from "../suppression-guard";
 
 // Constants
 const DEFAULT_MAX_REQUEST_BODY_SIZE: number = 4 * 1024; // 4 KB
@@ -412,6 +414,45 @@ export class PingopsHttpInstrumentation extends HttpInstrumentation {
   constructor(config?: PingopsHttpInstrumentationConfig) {
     super(config);
     this._config = this._createConfig(config);
+    this._installOutgoingSuppressionGuard();
+  }
+
+  /**
+   * HttpInstrumentation's span creation is private, so we wrap the instance method
+   * to swap suppressed parent contexts with ROOT_CONTEXT for outgoing user requests.
+   */
+  private _installOutgoingSuppressionGuard(): void {
+    type StartHttpSpan = (
+      name: string,
+      options: SpanOptions,
+      ctx?: ReturnType<typeof context.active>
+    ) => Span;
+
+    const target = this as unknown as { _startHttpSpan?: StartHttpSpan };
+    if (typeof target._startHttpSpan !== "function") {
+      return;
+    }
+
+    const originalStartHttpSpan = target._startHttpSpan.bind(this);
+    target._startHttpSpan = (
+      name: string,
+      options: SpanOptions,
+      ctx: ReturnType<typeof context.active> = context.active()
+    ): Span => {
+      if (options.kind !== SpanKind.CLIENT) {
+        return originalStartHttpSpan(name, options, ctx);
+      }
+
+      const requestUrl =
+        typeof options.attributes?.["url.full"] === "string"
+          ? options.attributes["url.full"]
+          : undefined;
+      const spanParentContext = resolveOutboundSpanParentContext(
+        ctx,
+        requestUrl
+      );
+      return originalStartHttpSpan(name, options, spanParentContext);
+    };
   }
 
   private _createConfig(
